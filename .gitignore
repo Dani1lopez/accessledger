@@ -1,0 +1,81 @@
+# --- Django / Python ---
+*.log
+*.pot
+*.pyc
+*.py[cod]
+*$py.class
+__pycache__/
+
+# Django local settings / secrets
+local_settings.py
+.env
+.env.*
+!.env.example
+
+# SQLite (por si alguien lo usa en dev)
+db.sqlite3
+db.sqlite3-journal
+
+# Media uploads (normalmente no se versionan)
+media/
+
+# Static collected (si usas collectstatic)
+staticfiles/
+
+# --- Virtualenvs ---
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# --- Packaging / build ---
+build/
+dist/
+*.egg-info/
+.eggs/
+wheels/
+pip-wheel-metadata/
+.Python
+MANIFEST
+
+# --- Tests / coverage ---
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+*.py,cover
+.pytest_cache/
+.tox/
+.nox/
+
+# --- Type checkers / linters ---
+.mypy_cache/
+.pyre/
+.pytype/
+ruff_cache/
+
+# --- Jupyter ---
+.ipynb_checkpoints/
+
+# --- IDEs ---
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/launch.json
+.idea/
+
+# --- OS ---
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.Spotlight-V100
+.Trashes
+
+# --- Docker ---
+**/.dockerignore
+*.pid
