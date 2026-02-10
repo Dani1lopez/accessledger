@@ -1,0 +1,55 @@
+{% extends "core/base.html" %}
+
+{% block title %}Resources · AccessLedger{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <div class="hero__left">
+    <h1 class="h1">Resources</h1>
+    <p class="muted">Inventario de activos (repos, servidores, SaaS…). Vista de lectura.</p>
+  </div>
+
+  <div class="hero__right">
+    <div class="search" role="search">
+      <label class="sr-only" for="q">Buscar</label>
+      <input id="q" class="search__input" type="search" placeholder="Buscar por nombre…" autocomplete="off">
+      <span class="search__kbd" aria-hidden="true">⌘K</span>
+    </div>
+  </div>
+</section>
+
+<section class="card lift-in">
+  <div class="card__header">
+    <div class="card__title">Listado</div>
+    <div class="pill" id="countPill">—</div>
+  </div>
+
+  <div class="table-wrap">
+    <table class="table" id="resourcesTable">
+      <thead>
+        <tr>
+          <th>Nombre</th>
+          <th>Tipo</th>
+          <th>Entorno</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in resources %}
+          <tr class="row">
+            <td class="mono">{{ r.name }}</td>
+            <td><span class="badge">{{ r.get_resource_type_display }}</span></td>
+            <td><span class="badge badge--soft">{{ r.get_environment_display }}</span></td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="3" class="empty">
+              No hay recursos todavía.
+              <span class="empty__hint">Crea algunos desde el admin para verlos aquí.</span>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

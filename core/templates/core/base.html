@@ -1,0 +1,35 @@
+{% load static %}
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="dark" />
+  <title>{% block title %}AccessLedger{% endblock %}</title>
+
+  <link rel="stylesheet" href="{% static 'core/css/app.css' %}">
+</head>
+
+<body>
+  <a class="skip-link" href="#main">Saltar al contenido</a>
+
+  <header class="topbar">
+    <div class="container topbar__inner">
+      <div class="brand">
+        <span class="brand__dot" aria-hidden="true"></span>
+        <span class="brand__name">AccessLedger</span>
+      </div>
+
+      <nav class="nav" aria-label="Navegación principal">
+        <a class="nav__link nav__link--active" href="{% url 'resource_list' %}">Resources</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main" class="container page">
+    {% block content %}{% endblock %}
+  </main>
+
+  <script defer src="{% static 'core/js/app.js' %}"></script>
+</body>
+</html>
