@@ -1,0 +1,63 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'core/css/auth.css' %}">
+{% endblock %}
+
+{% block title %}Login · AccessLedger{% endblock %}
+
+
+
+{% block content %}
+<section class="auth">
+  <div class="auth__bg" aria-hidden="true"></div>
+
+  <div class="auth__card lift-in">
+    <header class="auth__header">
+      <div class="auth__brand">
+        <span class="brand__dot" aria-hidden="true"></span>
+        <span class="auth__brandName">AccessLedger</span>
+      </div>
+
+      <h1 class="auth__title">Iniciar sesión</h1>
+      <p class="auth__subtitle">Accede para ver recursos según tu rol.</p>
+    </header>
+
+    {% if form.errors %}
+      <div class="alert alert--danger" role="alert">
+        <strong>Credenciales inválidas.</strong> Revisa usuario y contraseña.
+      </div>
+    {% endif %}
+
+    <form method="post" class="auth__form" novalidate>
+      {% csrf_token %}
+
+      <div class="field">
+        <label class="label" for="{{ form.username.id_for_label }}">Usuario</label>
+        <div class="control">
+          <span class="control__icon" aria-hidden="true">👤</span>
+          {{ form.username }}
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label" for="{{ form.password.id_for_label }}">Contraseña</label>
+        <div class="control">
+          <span class="control__icon" aria-hidden="true">🔒</span>
+          {{ form.password }}
+        </div>
+      </div>
+
+      <button class="btn btn--primary btn--block" type="submit">
+        Entrar
+        <span class="btn__shine" aria-hidden="true"></span>
+      </button>
+
+      <p class="auth__hint muted">
+        Tip: ⌘K / Ctrl+K en “Resources” para buscar rápido.
+      </p>
+    </form>
+  </div>
+</section>
+{% endblock %}
