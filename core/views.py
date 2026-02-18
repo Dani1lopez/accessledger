@@ -1,5 +1,7 @@
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import redirect, render, get_object_or_404
 from django.contrib.auth.decorators import permission_required, login_required
+
+from core.forms import AccessGrantForm
 from .models import AccessGrant, Resource
 
 @login_required
@@ -21,4 +23,23 @@ def resource_detail(request, pk):
     return render(request, "core/resource_detail.html", {
         "resource": resource,
         "grants": grants,
+    })
+
+@login_required
+@permission_required("core.can_grant_access", raise_exception=True)
+def grant_create(request, resource_pk):
+    resource = get_object_or_404(Resource, pk=resource_pk)
+    if request.method == "POST":
+        form = AccessGrantForm(request.POST)
+        if form.is_valid():
+            grant = form.save(commit=False)
+            grant.resource = resource
+            grant.status = AccessGrant.Status.ACTIVE
+            grant.save()
+            return redirect("resource_detail", pk=resource.pk)
+    else:
+        form = AccessGrantForm()
+    return render(request, "core/grant_create.html", {
+        "resource": resource,
+        "form": form,
     })
