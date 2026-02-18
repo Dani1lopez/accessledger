@@ -35,7 +35,7 @@
       </thead>
       <tbody>
         {% for r in resources %}
-          <tr class="row">
+          <tr class="row row--link" onclick="location.href='{% url 'resource_detail' r.pk %}'">
             <td class="mono">{{ r.name }}</td>
             <td><span class="badge">{{ r.get_resource_type_display }}</span></td>
             <td><span class="badge badge--soft">{{ r.get_environment_display }}</span></td>

@@ -462,3 +462,15 @@ a {
 @media (max-width: 520px){
   .nav__user--pill{ max-width: 9.5rem; }
 }
+
+
+.row--link {
+  cursor: pointer;
+}
+
+/* ── AccessGrant badges ── */
+.badge--active  { border-color: rgba(110,231,255,.25); color: rgba(110,231,255,.9);  background: rgba(110,231,255,.06); }
+.badge--revoked { border-color: rgba(255,80,90,.25);   color: rgba(255,80,90,.85);   background: rgba(255,80,90,.06);  }
+.badge--expired { border-color: rgba(154,167,182,.25); color: rgba(154,167,182,.75); background: rgba(154,167,182,.04);}
+.badge--write   { border-color: rgba(167,139,250,.25); color: rgba(167,139,250,.9);  background: rgba(167,139,250,.06);}
+.badge--admin   { border-color: rgba(251,191,36,.25);  color: rgba(251,191,36,.9);   background: rgba(251,191,36,.06); }

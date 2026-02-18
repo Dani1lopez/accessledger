@@ -1,0 +1,111 @@
+{% extends "core/base.html" %}
+{% block title %}{{ resource.name }} · AccessLedger{% endblock %}
+
+{% block content %}
+
+{# ── Hero ── #}
+<section class="hero">
+  <div class="hero__left">
+    <a href="{% url 'resource_list' %}" class="muted" style="font-size:13px;">← Resources</a>
+    <h1 class="h1" style="margin-top:8px;">{{ resource.name }}</h1>
+    <p class="muted">
+      <span class="badge">{{ resource.get_resource_type_display }}</span>
+      <span class="badge badge--soft" style="margin-left:6px;">{{ resource.get_environment_display }}</span>
+      {% if not resource.is_active %}
+        <span class="badge" style="margin-left:6px; border-color:rgba(255,80,90,.25); color:rgba(255,80,90,.85);">Inactivo</span>
+      {% endif %}
+    </p>
+  </div>
+</section>
+
+{# ── Ficha del recurso ── #}
+<section class="card lift-in" style="margin-bottom:24px;">
+  <div class="card__header">
+    <div class="card__title">Detalles</div>
+  </div>
+  <div style="padding:16px; display:grid; gap:12px;">
+
+    <div style="display:flex; gap:8px; align-items:baseline;">
+      <span class="muted" style="font-size:12px; min-width:80px;">URL</span>
+      {% if resource.url %}
+        <a href="{{ resource.url }}" target="_blank" rel="noopener" class="mono"
+           style="font-size:13px; color:var(--accent); word-break:break-all;">
+          {{ resource.url }}
+        </a>
+      {% else %}
+        <span class="muted mono" style="font-size:13px;">—</span>
+      {% endif %}
+    </div>
+
+    <div style="display:flex; gap:8px; align-items:baseline;">
+      <span class="muted" style="font-size:12px; min-width:80px;">Owner</span>
+      {% if resource.owner %}
+        <span class="mono" style="font-size:13px;">@{{ resource.owner.username }}</span>
+      {% else %}
+        <span class="muted mono" style="font-size:13px;">—</span>
+      {% endif %}
+    </div>
+
+    <div style="display:flex; gap:8px; align-items:baseline;">
+      <span class="muted" style="font-size:12px; min-width:80px;">Creado</span>
+      <span class="mono" style="font-size:13px;">{{ resource.created_at|date:"d/m/Y" }}</span>
+    </div>
+
+    <div style="display:flex; gap:8px; align-items:baseline;">
+      <span class="muted" style="font-size:12px; min-width:80px;">Actualizado</span>
+      <span class="mono" style="font-size:13px;">{{ resource.updated_at|date:"d/m/Y" }}</span>
+    </div>
+
+  </div>
+</section>
+
+{# ── AccessGrants ── #}
+<section class="card lift-in">
+  <div class="card__header">
+    <div class="card__title">Accesos</div>
+    <div class="pill">{{ grants.count }} grant{{ grants.count|pluralize:"s" }}</div>
+  </div>
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Usuario</th>
+          <th>Nivel</th>
+          <th>Estado</th>
+          <th>Desde</th>
+          <th>Hasta</th>
+          <th>Notas</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for g in grants %}
+          <tr class="row">
+            <td class="mono">@{{ g.user.username }}</td>
+            <td>
+              <span class="badge {% if g.access_level == 'admin' %}badge--admin{% elif g.access_level == 'write' %}badge--write{% endif %}">
+                {{ g.get_access_level_display }}
+              </span>
+            </td>
+            <td>
+              <span class="badge {% if g.status == 'active' %}badge--active{% elif g.status == 'revoked' %}badge--revoked{% elif g.status == 'expired' %}badge--expired{% endif %}">
+                {{ g.get_status_display }}
+              </span>
+            </td>
+            <td class="mono" style="font-size:13px;">{{ g.start_at|date:"d/m/Y" }}</td>
+            <td class="mono" style="font-size:13px;">{{ g.end_at|date:"d/m/Y" }}</td>
+            <td style="color:var(--muted); font-size:13px;">{{ g.notes|default:"—" }}</td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="6" class="empty">
+              Sin accesos registrados para este recurso.
+              <span class="empty__hint">Los grants aparecerán aquí cuando se creen.</span>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+{% endblock %}
