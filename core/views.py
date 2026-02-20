@@ -4,6 +4,8 @@ from django.http import JsonResponse, HttpResponseNotAllowed
 from core.forms import AccessGrantForm, ResourceForm
 from .models import AccessGrant, Resource
 from django.contrib.auth.models import User
+from django.contrib.auth.views import PasswordChangeView
+from django.urls import reverse_lazy
 
 @login_required
 @permission_required("core.view_resource", raise_exception=True)
@@ -138,3 +140,11 @@ def user_list(request):
     return JsonResponse({
         "users": list(user)
     })
+
+
+class CustomPasswordChangeView(PasswordChangeView):
+    success_url = reverse_lazy("resource_list")
+    def form_valid(self, form):
+        self.request.user.profile.must_change_password = False
+        self.request.user.profile.save()
+        return super().form_valid(form)
