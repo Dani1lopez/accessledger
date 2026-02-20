@@ -1,6 +1,6 @@
 from django.conf import settings
 from django.db import models
-
+from django.contrib.auth.models import User
 
 class Resource(models.Model):
     class ResourceType(models.TextChoices):
@@ -65,3 +65,8 @@ class AccessGrant(models.Model):
     
     def __str__(self):
         return f"{self.user} → {self.resource} ({self.access_level})"
+
+
+class Profile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    must_change_password = models.BooleanField(default=True)
