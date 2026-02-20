@@ -9,12 +9,18 @@
     <p class="muted">Inventario de activos (repos, servidores, SaaS…). Vista de lectura.</p>
   </div>
 
-  <div class="hero__right">
+  <div class="hero__right" style="display:flex; align-items:center; gap:12px;">
     <div class="search" role="search">
       <label class="sr-only" for="q">Buscar</label>
       <input id="q" class="search__input" type="search" placeholder="Buscar por nombre…" autocomplete="off">
       <span class="search__kbd" aria-hidden="true">⌘K</span>
     </div>
+    {% if perms.core.add_resource %}
+      <button id="btnNewResource"
+              style="padding:6px 14px; border-radius:6px; background:var(--accent); color:#0b0f14; font-size:13px; font-weight:600; border:none; cursor:pointer; white-space:nowrap;">
+        + Nuevo recurso
+      </button>
+    {% endif %}
   </div>
 </section>
 
@@ -44,7 +50,7 @@
           <tr>
             <td colspan="3" class="empty">
               No hay recursos todavía.
-              <span class="empty__hint">Crea algunos desde el admin para verlos aquí.</span>
+              <span class="empty__hint">Crea el primero con el botón de arriba.</span>
             </td>
           </tr>
         {% endfor %}
@@ -52,4 +58,47 @@
     </table>
   </div>
 </section>
+
+
+{# ── Modal: Nuevo recurso ── #}
+{% if perms.core.add_resource %}
+<dialog id="modalNewResource">
+  <div class="modal__header">
+    <span class="modal__title">Nuevo recurso</span>
+    <button id="btnCloseModal" class="modal__close" aria-label="Cerrar">×</button>
+  </div>
+
+  <form id="formNewResource" method="post" action="{% url 'resource_create' %}" novalidate class="modal__body">
+    {% csrf_token %}
+
+    <div id="modalErrors" class="modal__errors" style="display:none;"></div>
+
+    {% for field in form %}
+      <div class="modal__field">
+        <label for="{{ field.id_for_label }}" class="modal__label">
+          {{ field.label }}{% if field.field.required %} <span class="modal__required">*</span>{% endif %}
+        </label>
+        {% if field.field.widget.input_type == 'checkbox' %}
+          <label class="toggle">
+            {{ field }}
+            <span class="toggle__track">
+              <span class="toggle__thumb"></span>
+            </span>
+            <span class="toggle__label">Activo</span>
+          </label>
+        {% else %}
+          {{ field }}
+        {% endif %}
+        <div class="field-error" data-field="{{ field.html_name }}"></div>
+      </div>
+    {% endfor %}
+
+    <div class="modal__actions">
+      <button type="submit" class="modal__btn-submit">Crear recurso</button>
+      <button type="button" id="btnCancelModal" class="modal__btn-cancel">Cancelar</button>
+    </div>
+  </form>
+</dialog>
+{% endif %}
+
 {% endblock %}

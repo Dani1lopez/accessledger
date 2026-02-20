@@ -474,3 +474,286 @@ a {
 .badge--expired { border-color: rgba(154,167,182,.25); color: rgba(154,167,182,.75); background: rgba(154,167,182,.04);}
 .badge--write   { border-color: rgba(167,139,250,.25); color: rgba(167,139,250,.9);  background: rgba(167,139,250,.06);}
 .badge--admin   { border-color: rgba(251,191,36,.25);  color: rgba(251,191,36,.9);   background: rgba(251,191,36,.06); }
+
+/* ── Modal / Dialog ── */
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+dialog {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 18px;
+  background: linear-gradient(
+    160deg,
+    rgba(17, 28, 40, 0.98),
+    rgba(11, 18, 28, 0.99)
+  );
+  color: var(--text);
+  padding: 0;
+  width: 100%;
+  max-width: 500px;
+  box-shadow:
+    0 0 0 1px rgba(110, 231, 255, 0.06),
+    0 32px 80px rgba(0, 0, 0, 0.75),
+    0 8px 24px rgba(0, 0, 0, 0.4);
+  animation: modalIn 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+dialog::backdrop {
+  background: rgba(5, 8, 14, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.modal__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 22px 26px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  background: linear-gradient(
+    180deg,
+    rgba(110, 231, 255, 0.03),
+    transparent
+  );
+}
+
+.modal__title {
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  background: linear-gradient(135deg, var(--text) 60%, var(--muted));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.modal__close {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 16px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 5px 8px;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.15s ease;
+}
+
+.modal__close:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.14);
+  transform: scale(1.05);
+}
+
+.modal__body {
+  padding: 22px 26px 26px;
+}
+
+.modal__errors {
+  margin-bottom: 18px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 80, 90, 0.25);
+  background: rgba(255, 80, 90, 0.07);
+  color: rgba(255, 100, 110, 0.95);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.modal__field {
+  margin-bottom: 16px;
+}
+
+.modal__label {
+  display: block;
+  font-size: 11px;
+  color: rgba(154, 167, 182, 0.7);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-weight: 600;
+}
+
+.modal__required {
+  color: rgba(255, 80, 90, 0.6);
+}
+
+.modal__field input,
+.modal__field select,
+.modal__field textarea {
+  width: 100%;
+  padding: 10px 13px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 13.5px;
+  outline: none;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.modal__field select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239aa7b6' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px;
+}
+
+.modal__field input:focus,
+.modal__field select:focus,
+.modal__field textarea:focus {
+  border-color: rgba(110, 231, 255, 0.3);
+  background: rgba(110, 231, 255, 0.03);
+  box-shadow: 0 0 0 4px rgba(110, 231, 255, 0.07);
+}
+
+.modal__field input[type="checkbox"] {
+  width: auto;
+  accent-color: var(--accent);
+}
+
+.modal__field textarea {
+  resize: vertical;
+  min-height: 80px;
+  line-height: 1.5;
+}
+
+.field-error {
+  margin-top: 5px;
+  font-size: 12px;
+  color: rgba(255, 100, 110, 0.85);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.modal__actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 24px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.modal__btn-submit {
+  padding: 9px 22px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, var(--accent), rgba(110, 231, 255, 0.8));
+  color: #080d12;
+  font-size: 13px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  letter-spacing: 0.01em;
+  box-shadow: 0 4px 16px rgba(110, 231, 255, 0.2);
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.modal__btn-submit:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(110, 231, 255, 0.28);
+}
+
+.modal__btn-submit:active {
+  transform: translateY(0);
+}
+
+.modal__btn-cancel {
+  padding: 9px 20px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--muted);
+  font-size: 13px;
+  background: rgba(255, 255, 255, 0.02);
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.modal__btn-cancel:hover {
+  color: var(--text);
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggle__track {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.06);
+  transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.toggle input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle__thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: var(--muted);
+  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), background 0.2s ease;
+}
+
+.toggle input:checked ~ .toggle__track {
+  background: rgba(110, 231, 255, 0.15);
+  border-color: rgba(110, 231, 255, 0.35);
+  box-shadow: 0 0 0 3px rgba(110, 231, 255, 0.08);
+}
+
+.toggle input:checked ~ .toggle__track .toggle__thumb {
+  transform: translateX(18px);
+  background: var(--accent);
+}
+
+.toggle__label {
+  font-size: 13px;
+  color: var(--muted);
+  transition: color 0.15s ease;
+}
+
+.toggle:has(input:checked) .toggle__label {
+  color: var(--text);
+}

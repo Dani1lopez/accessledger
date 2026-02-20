@@ -1,0 +1,43 @@
+{% extends "core/base.html" %}
+{% block title %}Borrar {{ resource.name }} · AccessLedger{% endblock %}
+
+{% block content %}
+
+<section class="hero">
+  <div class="hero__left">
+    <a href="{% url 'resource_detail' resource.pk %}" class="muted" style="font-size:13px;">← {{ resource.name }}</a>
+    <h1 class="h1" style="margin-top:8px;">Borrar recurso</h1>
+  </div>
+</section>
+
+<section class="card lift-in" style="max-width:480px;">
+  <div class="card__header">
+    <div class="card__title" style="color:rgba(255,80,90,.85);">Acción irreversible</div>
+  </div>
+  <div style="padding:20px;">
+
+    <p style="font-size:14px; margin-bottom:8px;">
+      Estás a punto de borrar el recurso:
+    </p>
+    <p class="mono" style="font-size:16px; font-weight:600; margin-bottom:16px;">{{ resource.name }}</p>
+
+    <div style="padding:12px 14px; border-radius:8px; border:1px solid rgba(255,80,90,.25); background:rgba(255,80,90,.06); font-size:13px; color:rgba(255,80,90,.85); margin-bottom:24px;">
+      Esta acción no se puede deshacer. Se eliminarán también todos los grants asociados a este recurso.
+    </div>
+
+    <div style="display:flex; gap:10px;">
+      <form method="post" style="margin:0;">
+        {% csrf_token %}
+        <button type="submit" style="padding:8px 20px; border-radius:7px; background:rgba(255,80,90,.15); border:1px solid rgba(255,80,90,.3); color:rgba(255,80,90,.9); font-size:13px; font-weight:600; cursor:pointer;">
+          Sí, borrar
+        </button>
+      </form>
+      <a href="{% url 'resource_detail' resource.pk %}" style="padding:8px 20px; border-radius:7px; border:1px solid var(--border); color:var(--muted); font-size:13px; text-decoration:none;">
+        Cancelar
+      </a>
+    </div>
+
+  </div>
+</section>
+
+{% endblock %}

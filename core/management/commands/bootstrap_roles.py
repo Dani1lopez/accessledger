@@ -47,9 +47,9 @@ class Command(BaseCommand):
         ensure_perm(viewer, AccessGrant, "view_accessgrant")
         
         ensure_perm(editor, Resource, "view_resource")
+        ensure_perm(editor, Resource, "add_resource")
         ensure_perm(editor, Resource, "change_resource")
         ensure_perm(editor, AccessGrant, "view_accessgrant")
-        ensure_perm(editor, AccessGrant, "change_accessgrant")
         
         perms = viewer.permissions.values_list("codename", flat=True)
         self.stdout.write(f"Permisos viewer: {sorted(perms)}")

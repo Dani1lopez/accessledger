@@ -16,6 +16,28 @@
       {% endif %}
     </p>
   </div>
+
+  {% if perms.core.change_resource or perms.core.delete_resource %}
+    <div class="hero__right" style="display:flex; align-items:flex-start; gap:8px; padding-top:8px;">
+      {% if perms.core.change_resource %}
+        <button id="btnEditResource"
+                data-pk="{{ resource.pk }}"
+                data-url-data="{% url 'resource_data' resource.pk %}"
+                data-url-update="{% url 'resource_update' resource.pk %}"
+                style="padding:6px 14px; border-radius:6px; border:1px solid var(--border); color:var(--muted); font-size:13px; font-weight:500; background:none; cursor:pointer;">
+          Editar
+        </button>
+      {% endif %}
+      {% if perms.core.delete_resource %}
+        <button id="btnDeleteResource"
+                data-name="{{ resource.name }}"
+                data-url-delete="{% url 'resource_delete' resource.pk %}"
+                style="padding:6px 14px; border-radius:6px; border:1px solid rgba(255,80,90,.3); background:rgba(255,80,90,.08); color:rgba(255,80,90,.85); font-size:13px; font-weight:500; cursor:pointer;">
+          Borrar
+        </button>
+      {% endif %}
+    </div>
+  {% endif %}
 </section>
 
 {# ── Ficha del recurso ── #}
@@ -63,7 +85,17 @@
 <section class="card lift-in">
   <div class="card__header">
     <div class="card__title">Accesos</div>
-    <div class="pill">{{ grants.count }} grant{{ grants.count|pluralize:"s" }}</div>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <span class="pill">{{ grants.count }} grant{{ grants.count|pluralize:"s" }}</span>
+      {% if perms.core.can_grant_access %}
+        <button id="btnNewGrant"
+                data-url-create="{% url 'grant_create' resource_pk=resource.pk %}"
+                data-url-users="{% url 'user_list' %}"
+                style="padding:6px 14px; border-radius:6px; background:var(--accent); color:#fff; font-size:13px; font-weight:600; border:none; cursor:pointer;">
+          + Nuevo acceso
+        </button>
+      {% endif %}
+    </div>
   </div>
   <div class="table-wrap">
     <table class="table">
@@ -75,6 +107,9 @@
           <th>Desde</th>
           <th>Hasta</th>
           <th>Notas</th>
+          {% if perms.core.can_revoke_access %}
+            <th>Acciones</th>
+          {% endif %}
         </tr>
       </thead>
       <tbody>
@@ -94,10 +129,24 @@
             <td class="mono" style="font-size:13px;">{{ g.start_at|date:"d/m/Y" }}</td>
             <td class="mono" style="font-size:13px;">{{ g.end_at|date:"d/m/Y" }}</td>
             <td style="color:var(--muted); font-size:13px;">{{ g.notes|default:"—" }}</td>
+            {% if perms.core.can_revoke_access %}
+              <td>
+                {% if g.status == 'active' %}
+                  <form method="post" action="{% url 'grant_revoke' pk=g.pk %}" style="margin:0;" onsubmit="return confirm('¿Revocar acceso de @{{ g.user.username }}?')">
+                    {% csrf_token %}
+                    <button type="submit" style="padding:4px 12px; border:1px solid rgba(255,80,90,.3); border-radius:6px; background:rgba(255,80,90,.1); color:rgba(255,80,90,.85); font-size:12px; cursor:pointer;">
+                      Revocar
+                    </button>
+                  </form>
+                {% else %}
+                  <span class="muted" style="font-size:12px;">—</span>
+                {% endif %}
+              </td>
+            {% endif %}
           </tr>
         {% empty %}
           <tr>
-            <td colspan="6" class="empty">
+            <td colspan="7" class="empty">
               Sin accesos registrados para este recurso.
               <span class="empty__hint">Los grants aparecerán aquí cuando se creen.</span>
             </td>
@@ -107,5 +156,161 @@
     </table>
   </div>
 </section>
+
+{# ── Modal: Editar recurso ── #}
+{% if perms.core.change_resource %}
+<dialog id="modalEditResource">
+  <div class="modal__header">
+    <span class="modal__title">Editar recurso</span>
+    <button id="btnCloseEditModal" class="modal__close" aria-label="Cerrar">×</button>
+  </div>
+
+  <form id="formEditResource" method="post" novalidate class="modal__body">
+    {% csrf_token %}
+
+    <div id="editModalErrors" class="modal__errors" style="display:none;"></div>
+
+    <div class="modal__field">
+      <label for="edit_name" class="modal__label">Name <span class="modal__required">*</span></label>
+      <input type="text" id="edit_name" name="name" required maxlength="120">
+      <div class="field-error" data-field="name"></div>
+    </div>
+
+    <div class="modal__field">
+      <label for="edit_resource_type" class="modal__label">Resource Type <span class="modal__required">*</span></label>
+      <select id="edit_resource_type" name="resource_type" required>
+        <option value="repo">Repository</option>
+        <option value="server">Server</option>
+        <option value="vpn">VPN</option>
+        <option value="saas">SaaS</option>
+        <option value="database">Database</option>
+        <option value="dashboard">Dashboard</option>
+        <option value="other">Other</option>
+      </select>
+      <div class="field-error" data-field="resource_type"></div>
+    </div>
+
+    <div class="modal__field">
+      <label for="edit_environment" class="modal__label">Environment <span class="modal__required">*</span></label>
+      <select id="edit_environment" name="environment" required>
+        <option value="prod">Production</option>
+        <option value="staging">Staging</option>
+        <option value="dev">Development</option>
+        <option value="na">N/A</option>
+      </select>
+      <div class="field-error" data-field="environment"></div>
+    </div>
+
+    <div class="modal__field">
+      <label for="edit_url" class="modal__label">URL</label>
+      <input type="url" id="edit_url" name="url">
+      <div class="field-error" data-field="url"></div>
+    </div>
+
+    <div class="modal__field">
+      <label class="modal__label">Is Active</label>
+      <label class="toggle">
+        <input type="checkbox" id="edit_is_active" name="is_active">
+        <span class="toggle__track">
+          <span class="toggle__thumb"></span>
+        </span>
+        <span class="toggle__label">Activo</span>
+      </label>
+      <div class="field-error" data-field="is_active"></div>
+    </div>
+
+    <div class="modal__actions">
+      <button type="submit" class="modal__btn-submit">Guardar cambios</button>
+      <button type="button" id="btnCancelEditModal" class="modal__btn-cancel">Cancelar</button>
+    </div>
+  </form>
+</dialog>
+{% endif %}
+
+{# ── Modal: Borrar recurso ── #}
+{% if perms.core.delete_resource %}
+<dialog id="modalDeleteResource">
+  <div class="modal__header">
+    <span class="modal__title" style="color:rgba(255,80,90,.85);">Borrar recurso</span>
+    <button id="btnCloseDeleteModal" class="modal__close" aria-label="Cerrar">×</button>
+  </div>
+
+  <div class="modal__body">
+    <p style="font-size:14px; margin:0 0 8px;">Estás a punto de borrar el recurso:</p>
+    <p id="deleteResourceName" class="mono" style="font-size:16px; font-weight:600; margin:0 0 16px;"></p>
+
+    <div style="padding:12px 14px; border-radius:8px; border:1px solid rgba(255,80,90,.25); background:rgba(255,80,90,.06); font-size:13px; color:rgba(255,80,90,.85); margin-bottom:24px;">
+      Esta acción no se puede deshacer. Se eliminarán también todos los grants asociados a este recurso.
+    </div>
+
+    <form id="formDeleteResource" method="post" style="margin:0;">
+      {% csrf_token %}
+      <div class="modal__actions">
+        <button type="submit" style="padding:8px 20px; border-radius:7px; background:rgba(255,80,90,.15); border:1px solid rgba(255,80,90,.3); color:rgba(255,80,90,.9); font-size:13px; font-weight:600; cursor:pointer;">
+          Sí, borrar
+        </button>
+        <button type="button" id="btnCancelDeleteModal" class="modal__btn-cancel">Cancelar</button>
+      </div>
+    </form>
+  </div>
+</dialog>
+{% endif %}
+
+{# ── Modal: Nuevo acceso ── #}
+{% if perms.core.can_grant_access %}
+<dialog id="modalGrantCreate">
+  <div class="modal__header">
+    <span class="modal__title">Nuevo acceso</span>
+    <button id="btnCloseGrantModal" class="modal__close" aria-label="Cerrar">×</button>
+  </div>
+
+  <form id="formGrantCreate" method="post" novalidate class="modal__body">
+    {% csrf_token %}
+
+    <div id="grantModalErrors" class="modal__errors" style="display:none;"></div>
+
+    <div class="modal__field">
+      <label for="grant_user" class="modal__label">Usuario <span class="modal__required">*</span></label>
+      <select id="grant_user" name="user" required>
+        <option value="">Cargando usuarios…</option>
+      </select>
+      <div class="field-error" data-field="user"></div>
+    </div>
+
+    <div class="modal__field">
+      <label for="grant_access_level" class="modal__label">Nivel de acceso <span class="modal__required">*</span></label>
+      <select id="grant_access_level" name="access_level" required>
+        <option value="read">Read</option>
+        <option value="write">Write</option>
+        <option value="admin">Admin</option>
+      </select>
+      <div class="field-error" data-field="access_level"></div>
+    </div>
+
+    <div class="modal__field">
+      <label for="grant_start_at" class="modal__label">Desde <span class="modal__required">*</span></label>
+      <input type="date" id="grant_start_at" name="start_at" required>
+      <div class="field-error" data-field="start_at"></div>
+    </div>
+
+    <div class="modal__field">
+      <label for="grant_end_at" class="modal__label">Hasta <span class="modal__required">*</span></label>
+      <input type="date" id="grant_end_at" name="end_at" required>
+      <div class="field-error" data-field="end_at"></div>
+    </div>
+
+    <div class="modal__field">
+      <label for="grant_notes" class="modal__label">Notas</label>
+      <textarea id="grant_notes" name="notes" rows="3" style="width:100%; resize:vertical;"></textarea>
+      <div class="field-error" data-field="notes"></div>
+    </div>
+
+    <div class="modal__actions">
+      <button type="submit" class="modal__btn-submit">Crear acceso</button>
+      <button type="button" id="btnCancelGrantModal" class="modal__btn-cancel">Cancelar</button>
+    </div>
+  </form>
+</dialog>
+{% endif %}
 
 {% endblock %}

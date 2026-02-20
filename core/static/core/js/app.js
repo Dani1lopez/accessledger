@@ -101,3 +101,431 @@
     btn.textContent = "Entrando…";
   });
 })();
+
+document.addEventListener('DOMContentLoaded', () => {
+  'use strict';
+  const modal = document.getElementById('modalNewResource');
+  const btnOpen   = document.getElementById('btnNewResource');
+  const btnClose  = document.getElementById('btnCloseModal');
+  const btnCancel = document.getElementById('btnCancelModal');
+  const form      = document.getElementById('formNewResource');
+  const errBox    = document.getElementById('modalErrors');
+
+  if (!modal) return; // el usuario no tiene permisos o no está en esta página
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
+
+  function getCsrfToken() {
+    const value = `; ${document.cookie}`;
+    const parts = value.split('; csrftoken=');
+    if (parts.length === 2) return parts.pop().split(';').shift();
+    return '';
+  }
+
+  function openModal() {
+    clearErrors();
+    form.reset();
+    modal.showModal();
+  }
+
+  function closeModal() {
+    modal.close();
+  }
+
+  function clearErrors() {
+    errBox.style.display = 'none';
+    errBox.textContent = '';
+    document.querySelectorAll('.field-error').forEach(el => el.textContent = '');
+  }
+
+  // Prevenir XSS: nunca insertar HTML del servidor directamente en el DOM
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.appendChild(document.createTextNode(String(str)));
+    return div.innerHTML;
+  }
+
+  function showErrors(errors) {
+    let hasGeneral = false;
+
+    for (const [field, messages] of Object.entries(errors)) {
+      const safeMsg = messages.map(m => escapeHtml(m)).join(', ');
+      const fieldEl = document.querySelector(`.field-error[data-field="${field}"]`);
+      if (fieldEl) {
+        fieldEl.textContent = safeMsg; // textContent es seguro, no interpreta HTML
+      } else {
+        errBox.textContent += safeMsg + ' ';
+        hasGeneral = true;
+      }
+    }
+
+    if (hasGeneral) errBox.style.display = 'block';
+  }
+
+  // ── Eventos ──────────────────────────────────────────────────────────────
+
+  btnOpen.addEventListener('click', openModal);
+  btnClose.addEventListener('click', closeModal);
+  btnCancel.addEventListener('click', closeModal);
+
+  // Cerrar al hacer clic en el backdrop
+  modal.addEventListener('click', function (e) {
+    if (e.target === modal) closeModal();
+  });
+
+  // Submit con fetch
+  form.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    clearErrors();
+
+    try {
+      const response = await fetch(form.action, {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': getCsrfToken(),
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+        body: new FormData(form),
+      });
+
+      if (!response.ok && response.status !== 400) {
+        errBox.textContent = `Error del servidor (${response.status}). Inténtalo de nuevo.`;
+        errBox.style.display = 'block';
+        return;
+      }
+
+      const data = await response.json();
+
+      if (data.success) {
+        closeModal();
+        window.location.reload();
+      } else {
+        showErrors(data.errors || {});
+      }
+
+    } catch (err) {
+      errBox.textContent = 'Error de red. Comprueba tu conexión e inténtalo de nuevo.';
+      errBox.style.display = 'block';
+    }
+  });
+
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  'use strict';
+
+  const modal      = document.getElementById('modalEditResource');
+  const btnEdit    = document.getElementById('btnEditResource');
+  const btnClose   = document.getElementById('btnCloseEditModal');
+  const btnCancel  = document.getElementById('btnCancelEditModal');
+  const form       = document.getElementById('formEditResource');
+  const errBox     = document.getElementById('editModalErrors');
+
+  if (!modal || !btnEdit) return; // no estamos en resource_detail o sin permisos
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
+
+  function getCsrfToken() {
+    const value = `; ${document.cookie}`;
+    const parts = value.split('; csrftoken=');
+    if (parts.length === 2) return parts.pop().split(';').shift();
+    return '';
+  }
+
+  function closeModal() {
+    modal.close();
+  }
+
+  function clearErrors() {
+    errBox.style.display = 'none';
+    errBox.textContent = '';
+    modal.querySelectorAll('.field-error').forEach(el => el.textContent = '');
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.appendChild(document.createTextNode(String(str)));
+    return div.innerHTML;
+  }
+
+  function showErrors(errors) {
+    let hasGeneral = false;
+    for (const [field, messages] of Object.entries(errors)) {
+      const safeMsg = messages.map(m => escapeHtml(m)).join(', ');
+      const fieldEl = modal.querySelector(`.field-error[data-field="${field}"]`);
+      if (fieldEl) {
+        fieldEl.textContent = safeMsg;
+      } else {
+        errBox.textContent += safeMsg + ' ';
+        hasGeneral = true;
+      }
+    }
+    if (hasGeneral) errBox.style.display = 'block';
+  }
+
+  function fillForm(data) {
+    form.querySelector('#edit_name').value          = data.name        || '';
+    form.querySelector('#edit_resource_type').value = data.resource_type || '';
+    form.querySelector('#edit_environment').value   = data.environment  || '';
+    form.querySelector('#edit_url').value           = data.url          || '';
+    form.querySelector('#edit_is_active').checked   = data.is_active    === true;
+  }
+
+  // ── Abrir modal cargando datos via fetch ──────────────────────────────────
+
+  btnEdit.addEventListener('click', async () => {
+    clearErrors();
+
+    const urlData   = btnEdit.dataset.urlData;
+    const urlUpdate = btnEdit.dataset.urlUpdate;
+
+    try {
+      const response = await fetch(urlData, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      });
+
+      if (!response.ok) {
+        alert(`Error al cargar los datos (${response.status})`);
+        return;
+      }
+
+      const data = await response.json();
+      fillForm(data);
+      form.dataset.urlUpdate = urlUpdate; // guardamos la URL de submit en el form
+      modal.showModal();
+
+    } catch (err) {
+      alert('Error de red al cargar los datos del recurso.');
+    }
+  });
+
+  // ── Cerrar modal ──────────────────────────────────────────────────────────
+
+  btnClose.addEventListener('click', closeModal);
+  btnCancel.addEventListener('click', closeModal);
+  modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+
+  // ── Submit ────────────────────────────────────────────────────────────────
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    clearErrors();
+
+    const urlUpdate = form.dataset.urlUpdate;
+
+    try {
+      const response = await fetch(urlUpdate, {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': getCsrfToken(),
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+        body: new FormData(form),
+      });
+
+      if (!response.ok && response.status !== 400) {
+        errBox.textContent = `Error del servidor (${response.status}). Inténtalo de nuevo.`;
+        errBox.style.display = 'block';
+        return;
+      }
+
+      const data = await response.json();
+
+      if (data.success) {
+        closeModal();
+        window.location.reload();
+      } else {
+        showErrors(data.errors || {});
+      }
+
+    } catch (err) {
+      errBox.textContent = 'Error de red. Comprueba tu conexión e inténtalo de nuevo.';
+      errBox.style.display = 'block';
+    }
+  });
+
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  'use strict';
+
+  const modal      = document.getElementById('modalDeleteResource');
+  const btnDelete  = document.getElementById('btnDeleteResource');
+  const btnClose   = document.getElementById('btnCloseDeleteModal');
+  const btnCancel  = document.getElementById('btnCancelDeleteModal');
+  const form       = document.getElementById('formDeleteResource');
+  const nameEl     = document.getElementById('deleteResourceName');
+
+  if (!modal || !btnDelete) return;
+
+  function getCsrfToken() {
+    const value = `; ${document.cookie}`;
+    const parts = value.split('; csrftoken=');
+    if (parts.length === 2) return parts.pop().split(';').shift();
+    return '';
+  }
+
+  function closeModal() {
+    modal.close();
+  }
+
+  // Abrir modal con nombre del recurso
+  btnDelete.addEventListener('click', () => {
+    nameEl.textContent = btnDelete.dataset.name;
+    form.dataset.urlDelete = btnDelete.dataset.urlDelete;
+    modal.showModal();
+  });
+
+  btnClose.addEventListener('click', closeModal);
+  btnCancel.addEventListener('click', closeModal);
+  modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+
+  // Submit con fetch
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const urlDelete = form.dataset.urlDelete;
+
+    try {
+      const response = await fetch(urlDelete, {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': getCsrfToken(),
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+      });
+
+      if (response.ok) {
+        window.location.href = '/resources/';
+      } else {
+        alert(`Error al borrar (${response.status}). Inténtalo de nuevo.`);
+      }
+
+    } catch (err) {
+      alert('Error de red. Comprueba tu conexión e inténtalo de nuevo.');
+    }
+  });
+
+});
+document.addEventListener('DOMContentLoaded', () => {
+  'use strict';
+
+  const modal      = document.getElementById('modalGrantCreate');
+  const btnNew     = document.getElementById('btnNewGrant');
+  const btnClose   = document.getElementById('btnCloseGrantModal');
+  const btnCancel  = document.getElementById('btnCancelGrantModal');
+  const form       = document.getElementById('formGrantCreate');
+  const errBox     = document.getElementById('grantModalErrors');
+  const selectUser = document.getElementById('grant_user');
+
+  if (!modal || !btnNew) return;
+
+  function getCsrfToken() {
+    const value = `; ${document.cookie}`;
+    const parts = value.split('; csrftoken=');
+    if (parts.length === 2) return parts.pop().split(';').shift();
+    return '';
+  }
+
+  function closeModal() {
+    modal.close();
+  }
+
+  function clearErrors() {
+    errBox.style.display = 'none';
+    errBox.textContent = '';
+    modal.querySelectorAll('.field-error').forEach(el => el.textContent = '');
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.appendChild(document.createTextNode(String(str)));
+    return div.innerHTML;
+  }
+
+  function showErrors(errors) {
+    let hasGeneral = false;
+    for (const [field, messages] of Object.entries(errors)) {
+      const safeMsg = messages.map(m => escapeHtml(m)).join(', ');
+      const fieldEl = modal.querySelector(`.field-error[data-field="${field}"]`);
+      if (fieldEl) {
+        fieldEl.textContent = safeMsg;
+      } else {
+        errBox.textContent += safeMsg + ' ';
+        hasGeneral = true;
+      }
+    }
+    if (hasGeneral) errBox.style.display = 'block';
+  }
+
+  async function loadUsers(urlUsers) {
+    selectUser.innerHTML = '<option value="">Cargando…</option>';
+    try {
+      const response = await fetch(urlUsers, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      });
+      if (!response.ok) throw new Error(`${response.status}`);
+      const data = await response.json();
+      selectUser.innerHTML = '<option value="">— Selecciona un usuario —</option>';
+      data.users.forEach(u => {
+        const opt = document.createElement('option');
+        opt.value = u.id;
+        opt.textContent = u.username;
+        selectUser.appendChild(opt);
+      });
+    } catch (err) {
+      selectUser.innerHTML = '<option value="">Error al cargar usuarios</option>';
+    }
+  }
+
+  btnNew.addEventListener('click', async () => {
+    clearErrors();
+    form.reset();
+    const urlCreate = btnNew.dataset.urlCreate;
+    const urlUsers  = btnNew.dataset.urlUsers;
+    form.dataset.urlCreate = urlCreate;
+    await loadUsers(urlUsers);
+    modal.showModal();
+  });
+
+  btnClose.addEventListener('click', closeModal);
+  btnCancel.addEventListener('click', closeModal);
+  modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    clearErrors();
+
+    const urlCreate = form.dataset.urlCreate;
+
+    try {
+      const response = await fetch(urlCreate, {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': getCsrfToken(),
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+        body: new FormData(form),
+      });
+
+      if (!response.ok && response.status !== 400) {
+        errBox.textContent = `Error del servidor (${response.status}). Inténtalo de nuevo.`;
+        errBox.style.display = 'block';
+        return;
+      }
+
+      const data = await response.json();
+
+      if (data.success) {
+        closeModal();
+        window.location.reload();
+      } else {
+        showErrors(data.errors || {});
+      }
+
+    } catch (err) {
+      errBox.textContent = 'Error de red. Comprueba tu conexión e inténtalo de nuevo.';
+      errBox.style.display = 'block';
+    }
+  });
+});

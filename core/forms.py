@@ -1,5 +1,5 @@
 from django import forms
-from .models import AccessGrant
+from .models import AccessGrant, Resource
 
 class AccessGrantForm(forms.ModelForm):
     class Meta:
@@ -12,5 +12,11 @@ class AccessGrantForm(forms.ModelForm):
         end_at = cleaned_data.get("end_at")
         if start_at and end_at:
             if end_at <= start_at:
-                raise forms.ValidationError("Error no puede ser anteiro la fecha fin a la de fecha de inicio")
+                raise forms.ValidationError("Error no puede ser anterior la fecha fin a la de fecha de inicio")
         return cleaned_data
+
+
+class ResourceForm(forms.ModelForm):
+    class Meta:
+        model = Resource
+        fields = ["name", "resource_type", "environment", "url", "is_active"]

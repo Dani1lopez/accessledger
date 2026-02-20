@@ -1,0 +1,61 @@
+{% extends "core/base.html" %}
+{% block title %}Nuevo acceso · {{ resource.name }} · AccessLedger{% endblock %}
+
+{% block content %}
+
+{# ── Hero ── #}
+<section class="hero">
+  <div class="hero__left">
+    <a href="{% url 'resource_detail' pk=resource.pk %}" class="muted" style="font-size:13px;">← {{ resource.name }}</a>
+    <h1 class="h1" style="margin-top:8px;">Nuevo acceso</h1>
+    <p class="muted">
+      Asignar un grant para
+      <span class="badge">{{ resource.get_resource_type_display }}</span>
+      <strong>{{ resource.name }}</strong>
+    </p>
+  </div>
+</section>
+
+{# ── Formulario ── #}
+<section class="card lift-in" style="max-width:560px;">
+  <div class="card__header">
+    <div class="card__title">Datos del acceso</div>
+  </div>
+
+  <form method="post" style="padding:20px; display:grid; gap:16px;">
+    {% csrf_token %}
+
+    {% if form.non_field_errors %}
+      <div style="background:rgba(255,80,90,.1); border:1px solid rgba(255,80,90,.25); border-radius:8px; padding:12px; font-size:13px; color:rgba(255,80,90,.9);">
+        {% for error in form.non_field_errors %}
+          <p style="margin:0;">{{ error }}</p>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    {% for field in form %}
+      <div style="display:grid; gap:4px;">
+        <label for="{{ field.id_for_label }}" class="muted" style="font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.5px;">
+          {{ field.label }}{% if field.field.required %} <span style="color:rgba(255,80,90,.8);">*</span>{% endif %}
+        </label>
+        {{ field }}
+        {% if field.errors %}
+          {% for error in field.errors %}
+            <span style="font-size:12px; color:rgba(255,80,90,.85);">{{ error }}</span>
+          {% endfor %}
+        {% endif %}
+      </div>
+    {% endfor %}
+
+    <div style="display:flex; gap:10px; margin-top:8px;">
+      <button type="submit" class="btn btn--primary" style="padding:10px 24px; border:none; border-radius:8px; background:var(--accent); color:#fff; font-weight:600; font-size:14px; cursor:pointer;">
+        Crear acceso
+      </button>
+      <a href="{% url 'resource_detail' pk=resource.pk %}" class="btn" style="padding:10px 24px; border:1px solid var(--border); border-radius:8px; color:var(--muted); font-size:14px; text-decoration:none; display:inline-flex; align-items:center;">
+        Cancelar
+      </a>
+    </div>
+  </form>
+</section>
+
+{% endblock %}
