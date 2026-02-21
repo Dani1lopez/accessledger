@@ -14,4 +14,5 @@ urlpatterns = [
     path("users/profile/", views.user_profile, name="user_profile"),
     path("users/manage/", views.user_management, name="user_management"),
     path("users/<int:pk>/toggle/", views.user_toggle_active, name="user_toggle_active"),
+    path("users/create/", views.user_create, name="user_create")
 ]

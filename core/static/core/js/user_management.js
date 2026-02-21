@@ -25,4 +25,54 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
   });
+  // Modal crear usuario
+const modalCreateUser = document.getElementById("modalCreateUser");
+const btnNewUser = document.getElementById("btnNewUser");
+const btnCloseCreateUser = document.getElementById("btnCloseCreateUser");
+const btnCancelCreateUser = document.getElementById("btnCancelCreateUser");
+const formCreateUser = document.getElementById("formCreateUser");
+const createUserErrors = document.getElementById("createUserErrors");
+
+btnNewUser.addEventListener("click", () => {
+  formCreateUser.reset();
+  createUserErrors.style.display = "none";
+  modalCreateUser.showModal();
+});
+
+[btnCloseCreateUser, btnCancelCreateUser].forEach((btn) => {
+  btn.addEventListener("click", () => modalCreateUser.close());
+});
+
+modalCreateUser.addEventListener("click", (e) => {
+  if (e.target === modalCreateUser) modalCreateUser.close();
+});
+
+formCreateUser.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  createUserErrors.style.display = "none";
+
+  const formData = new FormData(formCreateUser);
+
+  const response = await fetch("/users/create/", {
+    method: "POST",
+    headers: {
+      "X-CSRFToken": getCsrfToken(),
+      "X-Requested-With": "XMLHttpRequest",
+    },
+    body: formData,
+  });
+
+  const data = await response.json();
+
+  if (data.success) {
+    modalCreateUser.close();
+    location.reload();
+  } else {
+    const messages = Object.entries(data.errors)
+      .map(([field, errs]) => `<strong>${field}:</strong> ${errs.join(", ")}`)
+      .join("<br>");
+    createUserErrors.innerHTML = messages;
+    createUserErrors.style.display = "block";
+  }
+});
 });

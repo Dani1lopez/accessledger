@@ -1,6 +1,8 @@
+from dataclasses import fields
+
 from django import forms
 from .models import AccessGrant, Resource
-
+from django.contrib.auth.models import User, Group
 class AccessGrantForm(forms.ModelForm):
     class Meta:
         model = AccessGrant
@@ -20,3 +22,11 @@ class ResourceForm(forms.ModelForm):
     class Meta:
         model = Resource
         fields = ["name", "resource_type", "environment", "url", "is_active"]
+
+
+class UserForm(forms.ModelForm):
+    role = forms.ModelChoiceField(queryset=Group.objects.all())
+    password = forms.CharField(widget=forms.PasswordInput)
+    class Meta:
+        model = User
+        fields = ["username", "email", "first_name", "last_name"]

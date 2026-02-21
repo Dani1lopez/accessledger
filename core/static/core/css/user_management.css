@@ -48,3 +48,16 @@
     color: rgba(110,231,255,0.95);
     background: rgba(110,231,255,0.08);
   }
+/* Ajustes modal crear usuario */
+#modalCreateUser .modal__body {
+  padding-bottom: 8px;
+}
+
+#modalCreateUser .modal__field {
+  margin-bottom: 12px;
+}
+
+#modalCreateUser .modal__actions {
+  padding: 14px 26px 20px;
+  margin-top: 0;
+}
