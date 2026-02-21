@@ -1,6 +1,7 @@
 from django.shortcuts import redirect, render, get_object_or_404
 from django.contrib.auth.decorators import permission_required, login_required
 from django.http import JsonResponse, HttpResponseNotAllowed
+from core.decorators import admin_required
 from core.forms import AccessGrantForm, ResourceForm
 from .models import AccessGrant, Resource
 from django.contrib.auth.models import User
@@ -155,3 +156,23 @@ def user_profile(request):
     return render(request, "core/user_profile.html", {
         "user": user,
     })
+
+
+@login_required
+@admin_required
+def user_management(request):
+    users = User.objects.all().prefetch_related("groups")
+    return render(request, "core/user_management.html", {
+        "users": users
+    })
+
+@login_required
+@admin_required
+def user_toggle_active(request, pk):
+    if request.method == "POST":
+        user = get_object_or_404(User, pk=pk)
+        user.is_active = not user.is_active
+        user.save()
+        return JsonResponse({"success": True})
+    else:
+        return JsonResponse({"success": False}, status=405)

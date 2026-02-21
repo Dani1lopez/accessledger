@@ -11,5 +11,7 @@ urlpatterns = [
     path("resources/<int:pk>/edit/", views.resource_update, name="resource_update"),
     path("resources/<int:pk>/delete/", views.resource_delete, name="resource_delete"),
     path("resources/<int:pk>/data/", views.resource_data, name="resource_data"),
-    path("users/profile/", views.user_profile, name="user_profile")
+    path("users/profile/", views.user_profile, name="user_profile"),
+    path("users/manage/", views.user_management, name="user_management"),
+    path("users/<int:pk>/toggle/", views.user_toggle_active, name="user_toggle_active"),
 ]

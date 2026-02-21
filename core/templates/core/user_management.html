@@ -1,0 +1,95 @@
+{% extends "core/base.html" %}
+
+{% block title %}Gestión de usuarios · AccessLedger{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/core/css/user_management.css">
+{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <div class="hero__left">
+    <h1 class="h1">Gestión de usuarios</h1>
+    <p class="muted">Administra cuentas, roles y accesos del sistema.</p>
+  </div>
+  <div class="hero__right" style="display:flex; align-items:center; gap:12px;">
+    <div class="search" role="search">
+      <label class="sr-only" for="q">Buscar</label>
+      <input id="q" class="search__input" type="search" placeholder="Buscar por usuario…" autocomplete="off">
+      <span class="search__kbd" aria-hidden="true">⌘K</span>
+    </div>
+    <button id="btnNewUser"
+            style="padding:6px 14px; border-radius:6px; background:var(--accent); color:#0b0f14; font-size:13px; font-weight:600; border:none; cursor:pointer; white-space:nowrap;">
+      + Nuevo usuario
+    </button>
+  </div>
+</section>
+
+<section class="card lift-in">
+  <div class="card__header">
+    <div class="card__title">Usuarios</div>
+    <div class="pill" id="countPill">{{ users|length }} usuario{{ users|length|pluralize:"s" }}</div>
+  </div>
+
+  <div class="table-wrap">
+    <table class="table" id="usersTable">
+      <thead>
+        <tr>
+          <th>Usuario</th>
+          <th>Email</th>
+          <th>Rol</th>
+          <th>Último acceso</th>
+          <th>Estado</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in users %}
+        <tr class="row">
+          <td class="mono">@{{ u.username }}</td>
+          <td>{{ u.email|default:"—" }}</td>
+          <td>
+            {% for group in u.groups.all %}
+              <span class="badge badge--role" style="border-color:rgba(167,139,250,0.25);color:rgba(167,139,250,0.9);background:rgba(167,139,250,0.06);text-transform:capitalize;">{{ group.name }}</span>
+            {% empty %}
+              <span class="badge" style="color:var(--muted);">Sin rol</span>
+            {% endfor %}
+          </td>
+          <td style="color:var(--muted); font-size:13px;">
+            {% if u.last_login %}{{ u.last_login|date:"d M Y, H:i" }}{% else %}—{% endif %}
+          </td>
+          <td>
+            {% if u.is_active %}
+              <span class="badge badge--active">
+                <span class="status-dot status-dot--active"></span>Activo
+              </span>
+            {% else %}
+              <span class="badge" style="color:var(--muted);">
+                <span class="status-dot status-dot--inactive"></span>Inactivo
+              </span>
+            {% endif %}
+          </td>
+          <td>
+            <div class="actions">
+              <button class="btn-action" data-action="edit" data-pk="{{ u.pk }}">Editar</button>
+              {% if u.is_active %}
+                <button class="btn-action btn-action--danger" data-action="toggle" data-pk="{{ u.pk }}">Desactivar</button>
+              {% else %}
+                <button class="btn-action btn-action--success" data-action="toggle" data-pk="{{ u.pk }}">Activar</button>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="6" class="empty">No hay usuarios todavía.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
+{% block extra_js %}
+<script defer src="/static/core/js/user_management.js"></script>
+{% endblock %}
