@@ -148,3 +148,10 @@ class CustomPasswordChangeView(PasswordChangeView):
         self.request.user.profile.must_change_password = False
         self.request.user.profile.save()
         return super().form_valid(form)
+
+@login_required
+def user_profile(request):
+    user = request.user
+    return render(request, "core/user_profile.html", {
+        "user": user,
+    })
