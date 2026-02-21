@@ -1,0 +1,249 @@
+{% extends "core/base.html" %}
+
+{% block title %}Perfil — AccessLedger{% endblock %}
+
+{% block extra_css %}
+<style>
+  .profile-page {
+    max-width: 720px;
+  }
+
+  .page-header {
+    margin: 18px 0 28px;
+  }
+
+  .page-title {
+    margin: 0 0 6px;
+    font-size: clamp(28px, 3vw, 36px);
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+  }
+
+  .page-subtitle {
+    margin: 0;
+    color: var(--muted);
+  }
+
+  .profile-grid {
+    display: grid;
+    gap: 16px;
+  }
+
+  .profile-card {
+    border-radius: var(--radius);
+    border: 1px solid var(--line);
+    background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.015));
+    box-shadow: var(--shadow);
+    padding: 26px;
+    animation: liftIn 0.35s ease-out both;
+  }
+
+  .profile-card:nth-child(2) {
+    animation-delay: 0.06s;
+  }
+
+  .profile-card__header {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    margin-bottom: 26px;
+    padding-bottom: 22px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .profile-avatar {
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, rgba(110,231,255,0.15), rgba(167,139,250,0.15));
+    border: 1px solid rgba(110,231,255,0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--accent);
+    flex-shrink: 0;
+  }
+
+  .profile-card__title {
+    margin: 0 0 6px;
+    font-size: 16px;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+  }
+
+  .profile-card__title--standalone {
+    margin: 0 0 8px;
+  }
+
+  .profile-card__subtitle {
+    margin: 0;
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .profile-card__desc {
+    margin: 0 0 20px;
+    color: var(--muted);
+    font-size: 13.5px;
+    line-height: 1.6;
+  }
+
+  .profile-details {
+    margin: 0;
+    display: grid;
+    gap: 2px;
+  }
+
+  .profile-details__row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 11px 14px;
+    border-radius: 10px;
+    transition: background 0.15s ease;
+  }
+
+  .profile-details__row:hover {
+    background: rgba(255,255,255,0.025);
+  }
+
+  .profile-details__label {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--muted);
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .profile-details__value {
+    font-size: 13.5px;
+    color: var(--text);
+    text-align: right;
+  }
+
+  .text-muted { color: var(--muted); }
+
+  .badge--role {
+    border-color: rgba(167,139,250,0.25);
+    color: rgba(167,139,250,0.9);
+    background: rgba(167,139,250,0.06);
+    text-transform: capitalize;
+  }
+
+  .badge--muted { color: var(--muted); }
+
+  .badge--active-status {
+    border-color: rgba(110,231,255,0.25);
+    color: rgba(110,231,255,0.9);
+    background: rgba(110,231,255,0.06);
+  }
+
+  .badge--inactive-status {
+    border-color: rgba(255,80,90,0.25);
+    color: rgba(255,80,90,0.85);
+    background: rgba(255,80,90,0.06);
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 20px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    text-decoration: none;
+    transition: opacity 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .btn--primary {
+    background: linear-gradient(135deg, var(--accent), rgba(110,231,255,0.8));
+    color: #080d12;
+    box-shadow: 0 4px 16px rgba(110,231,255,0.2);
+  }
+
+  .btn--primary:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(110,231,255,0.28);
+  }
+
+  .btn--full { width: 100%; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="profile-page">
+
+  <div class="page-header">
+    <h1 class="page-title">Perfil</h1>
+    <p class="page-subtitle">Información de tu cuenta y configuración de seguridad.</p>
+  </div>
+
+  <div class="profile-grid">
+
+    <section class="profile-card">
+      <div class="profile-card__header">
+        <div class="profile-avatar" aria-hidden="true">{{ user.username|first|upper }}</div>
+        <div>
+          <h2 class="profile-card__title">@{{ user.username }}</h2>
+          <p class="profile-card__subtitle">
+            {% for group in user.groups.all %}
+              <span class="badge badge--role">{{ group.name }}</span>
+            {% empty %}
+              <span class="badge badge--muted">Sin rol asignado</span>
+            {% endfor %}
+          </p>
+        </div>
+      </div>
+
+      <dl class="profile-details">
+        <div class="profile-details__row">
+          <dt class="profile-details__label">Usuario</dt>
+          <dd class="profile-details__value mono">{{ user.username }}</dd>
+        </div>
+        <div class="profile-details__row">
+          <dt class="profile-details__label">Email</dt>
+          <dd class="profile-details__value">
+            {% if user.email %}{{ user.email }}{% else %}<span class="text-muted">—</span>{% endif %}
+          </dd>
+        </div>
+        <div class="profile-details__row">
+          <dt class="profile-details__label">Miembro desde</dt>
+          <dd class="profile-details__value">{{ user.date_joined|date:"d M Y" }}</dd>
+        </div>
+        <div class="profile-details__row">
+          <dt class="profile-details__label">Último acceso</dt>
+          <dd class="profile-details__value">
+            {% if user.last_login %}{{ user.last_login|date:"d M Y, H:i" }}{% else %}<span class="text-muted">—</span>{% endif %}
+          </dd>
+        </div>
+        <div class="profile-details__row">
+          <dt class="profile-details__label">Estado</dt>
+          <dd class="profile-details__value">
+            {% if user.is_active %}
+              <span class="badge badge--active-status">Activo</span>
+            {% else %}
+              <span class="badge badge--inactive-status">Inactivo</span>
+            {% endif %}
+          </dd>
+        </div>
+      </dl>
+    </section>
+
+    <section class="profile-card">
+      <h2 class="profile-card__title profile-card__title--standalone">Seguridad</h2>
+      <p class="profile-card__desc">Actualiza tu contraseña regularmente para mantener tu cuenta segura.</p>
+      <a href="{% url 'password_change' %}" class="btn btn--primary btn--full">Cambiar contraseña</a>
+    </section>
+
+  </div>
+</div>
+{% endblock %}
