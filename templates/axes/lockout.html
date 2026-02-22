@@ -1,0 +1,33 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'core/css/auth.css' %}">
+{% endblock %}
+
+{% block title %}Cuenta bloqueada · AccessLedger{% endblock %}
+
+{% block content %}
+<section class="auth">
+  <div class="auth__bg" aria-hidden="true"></div>
+
+  <div class="auth__card lift-in">
+    <header class="auth__header">
+      <div class="auth__brand">
+        <span class="brand__dot" aria-hidden="true"></span>
+        <span class="auth__brandName">AccessLedger</span>
+      </div>
+      <h1 class="auth__title" style="color: rgba(255,80,90,.9);">Cuenta bloqueada</h1>
+      <p class="auth__subtitle">Demasiados intentos fallidos de acceso. Por seguridad, tu cuenta ha sido bloqueada temporalmente.</p>
+    </header>
+
+    <div class="alert" role="alert" style="margin-top: 0;">
+      Vuelve a intentarlo más tarde. Si crees que es un error, contacta con el administrador del sistema.
+    </div>
+
+    <p class="auth__hint muted" style="text-align:center; margin-top: 16px;">
+      El bloqueo se levantará automáticamente pasado un tiempo.
+    </p>
+  </div>
+</section>
+{% endblock %}
