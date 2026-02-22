@@ -11,7 +11,7 @@
     {% block extra_css %}{% endblock %}
   </head>
 
-  <body>
+  
     <a class="skip-link" href="#main">Saltar al contenido</a>
 
     <header class="topbar">
@@ -28,6 +28,10 @@
             href="{% url 'resource_list' %}"
             >Resources</a
           >
+
+          {% if perms.core.delete_resource %}
+            <a class="nav__link" href="{% url 'user_management' %}">Usuarios</a>
+          {% endif %}
 
           <div class="nav__spacer" aria-hidden="true"></div>
 
@@ -57,7 +61,7 @@
     <main id="main" class="container page">
       {% block content %}{% endblock %}
     </main>
-
-    <script defer src="{% static 'core/js/app.js' %}"></script>
+  <script defer src="{% static 'core/js/app.js' %}"></script>
+  {% block extra_js %}{% endblock %}
   </body>
 </html>

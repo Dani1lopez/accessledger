@@ -9,7 +9,7 @@ class ForcePasswordChangeMiddleware:
         self.get_response = get_response
     
     def __call__(self, request):
-        if request.user.is_authenticated and request.user.profile.must_change_password == True and request.path not in ALLOWED_PATHS:
+        if (request.user.is_authenticated and hasattr(request.user, 'profile') and request.user.profile.must_change_password == True and request.path not in ALLOWED_PATHS):
             return redirect("password_change")
         response = self.get_response(request)
         return response
