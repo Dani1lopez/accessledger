@@ -48,16 +48,37 @@
     color: rgba(110,231,255,0.95);
     background: rgba(110,231,255,0.08);
   }
+
 /* Ajustes modal crear usuario */
 #modalCreateUser .modal__body {
   padding-bottom: 8px;
 }
-
 #modalCreateUser .modal__field {
   margin-bottom: 12px;
 }
-
 #modalCreateUser .modal__actions {
   padding: 14px 26px 20px;
   margin-top: 0;
+}
+
+/* Ajustes modal editar usuario */
+#modalEditUser .modal__body {
+  padding-bottom: 8px;
+}
+#modalEditUser .modal__field {
+  margin-bottom: 12px;
+}
+#modalEditUser .modal__actions {
+  padding: 14px 26px 20px;
+  margin-top: 0;
+}
+
+/* Label opcional */
+.modal__optional {
+  color: rgba(154, 167, 182, 0.45);
+  font-size: 10px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  margin-left: 4px;
 }

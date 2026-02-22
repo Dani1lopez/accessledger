@@ -198,3 +198,43 @@ def user_create(request):
     return render(request, "core/user_create.html", {
         "form": form
     })
+
+@login_required
+@admin_required
+def user_data(request, pk):
+    user = get_object_or_404(User, pk=pk)
+    group = user.groups.first()
+    return JsonResponse({
+        "username": user.username,
+        "email": user.email,
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "group": group.id if group is not None else None,
+    })
+
+@login_required
+@admin_required
+def user_update(request, pk):
+    is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+    user = get_object_or_404(User, pk=pk)
+    if request.method == "POST":
+        form = UserForm(request.POST, instance=user)
+        if form.is_valid():
+            user = form.save(commit=False)
+            user.groups.clear()
+            user.groups.add(form.cleaned_data['role'])
+            password = form.cleaned_data.get('password')
+            if password:
+                user.set_password(password)
+            user.save()
+            return JsonResponse({"success": True})
+        elif is_ajax:
+            return JsonResponse({"success": False, "errors": form.errors})
+    elif is_ajax:
+        return HttpResponseNotAllowed(["POST"])
+    else:
+        form = UserForm()
+    return render(request, "core/user_update.html", {
+        "user": user,
+        "form": form
+    })
