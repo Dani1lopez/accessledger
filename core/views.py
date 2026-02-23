@@ -361,3 +361,11 @@ def user_update(request, pk):
         "user": user,
         "form": form
     })
+
+@login_required
+@admin_required
+def audit_log(request):
+    audit = AuditLog.objects.all().order_by("-timestamp").select_related("user")
+    return render(request, "core/audit_log.html", {
+        "audit": audit,
+    })

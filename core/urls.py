@@ -17,4 +17,5 @@ urlpatterns = [
     path("users/create/", views.user_create, name="user_create"),
     path("users/<int:pk>/data/", views.user_data, name="user_data"),
     path("users/<int:pk>/edit/", views.user_update, name="user_update"),
+    path("audit_log/", views.audit_log, name="audit_log"),
 ]
