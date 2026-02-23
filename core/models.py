@@ -84,7 +84,8 @@ class AuditLog(models.Model):
         GRANT_EXPIRED = "grant_expired", "Grant expired"
         USER_CREATED = "user_created", "User created"
         USER_ACTIVATED = "user_activated", "User activated"
-        USER_DEACTIVATED = "user_deactivated", "User deactivate"
+        USER_DEACTIVATED = "user_deactivated", "User deactivated"
+        USER_UPDATED = "user_updated", "User updated"
     user = models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL, null=True)
     action = models.CharField(max_length=20, choices=Action.choices)
     object_type = models.CharField(max_length=20)

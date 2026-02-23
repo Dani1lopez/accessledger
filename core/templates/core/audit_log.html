@@ -1,0 +1,159 @@
+{% extends "core/base.html" %}
+
+{% block title %}Audit Log · AccessLedger{% endblock %}
+
+{% block content %}
+
+<section class="hero">
+  <div class="hero__left">
+    <h1 class="h1">Audit Log</h1>
+    <p class="muted">Registro de todas las acciones realizadas en el sistema.</p>
+  </div>
+</section>
+
+<section class="card lift-in">
+  <div class="card__header">
+    <div class="card__title">Actividad</div>
+    <div class="pill">{{ audit|length }} registro{{ audit|length|pluralize:"s" }}</div>
+  </div>
+
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Cuándo</th>
+          <th>Usuario</th>
+          <th>Acción</th>
+          <th>Objeto</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry in audit %}
+          <tr class="row">
+            <td class="mono" style="font-size:12px; color:var(--muted); white-space:nowrap;">
+              {{ entry.timestamp|date:"d/m/Y H:i" }}
+            </td>
+            <td class="mono">
+              {% if entry.user %}
+                @{{ entry.user.username }}
+              {% else %}
+                <span class="muted">—</span>
+              {% endif %}
+            </td>
+            <td>
+              <span class="badge {% if 'created' in entry.action %}badge--active{% elif 'deleted' in entry.action or 'revoked' in entry.action or 'deactivated' in entry.action %}badge--revoked{% elif 'updated' in entry.action or 'activated' in entry.action or 'expired' in entry.action %}badge--write{% endif %}">
+                {{ entry.get_action_display }}
+              </span>
+            </td>
+            <td>
+              <span style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;">{{ entry.object_type }}</span>
+              <span class="mono" style="font-size:13px; display:block;">{{ entry.object_repr }}</span>
+            </td>
+            <td>
+              <button class="btn-detail"
+                data-before="{{ entry.before|default:'' }}"
+                data-after="{{ entry.after|default:'' }}"
+                data-action="{{ entry.get_action_display }}"
+                data-object="{{ entry.object_repr }}">
+                Ver detalle
+              </button>
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="5" class="empty">
+              No hay registros todavía.
+              <span class="empty__hint">Las acciones del sistema aparecerán aquí.</span>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+{# ── Modal: Detalle de entrada ── #}
+<dialog id="modalAuditDetail">
+  <div class="modal__header">
+    <div>
+      <span class="modal__title" id="detailAction"></span>
+      <span class="mono" style="font-size:12px; color:var(--muted); display:block; margin-top:2px;" id="detailObject"></span>
+    </div>
+    <button id="btnCloseDetail" class="modal__close" aria-label="Cerrar">×</button>
+  </div>
+
+  <div class="modal__body" style="display:grid; gap:16px;">
+
+    <div>
+      <div style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.07em; font-weight:600; margin-bottom:8px;">Antes</div>
+      <pre id="detailBefore" style="margin:0; padding:12px 14px; border-radius:10px; background:rgba(255,80,90,.05); border:1px solid rgba(255,80,90,.12); font-family:var(--mono); font-size:12px; color:rgba(154,167,182,.8); white-space:pre-wrap; word-break:break-all; line-height:1.6;"></pre>
+    </div>
+
+    <div>
+      <div style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.07em; font-weight:600; margin-bottom:8px;">Después</div>
+      <pre id="detailAfter" style="margin:0; padding:12px 14px; border-radius:10px; background:rgba(110,231,255,.04); border:1px solid rgba(110,231,255,.12); font-family:var(--mono); font-size:12px; color:rgba(110,231,255,.7); white-space:pre-wrap; word-break:break-all; line-height:1.6;"></pre>
+    </div>
+
+  </div>
+</dialog>
+
+<style>
+.btn-detail {
+  padding: 4px 12px;
+  border-radius: 7px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,.02);
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+  transition: color .15s ease, border-color .15s ease, background .15s ease;
+}
+.btn-detail:hover {
+  color: var(--text);
+  border-color: var(--line2);
+  background: rgba(255,255,255,.05);
+}
+</style>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const modal        = document.getElementById('modalAuditDetail');
+  const btnClose     = document.getElementById('btnCloseDetail');
+  const detailAction = document.getElementById('detailAction');
+  const detailObject = document.getElementById('detailObject');
+  const detailBefore = document.getElementById('detailBefore');
+  const detailAfter  = document.getElementById('detailAfter');
+
+  function formatJSON(str) {
+    if (!str) return '—';
+    try {
+      const fixed = str
+        .replace(/'/g, '"')
+        .replace(/True/g, 'true')
+        .replace(/False/g, 'false')
+        .replace(/None/g, 'null');
+      return JSON.stringify(JSON.parse(fixed), null, 2);
+    } catch {
+      return str;
+    }
+  }
+
+  document.querySelectorAll('.btn-detail').forEach(btn => {
+    btn.addEventListener('click', () => {
+      detailAction.textContent = btn.dataset.action;
+      detailObject.textContent = btn.dataset.object;
+      detailBefore.textContent = formatJSON(btn.dataset.before);
+      detailAfter.textContent  = formatJSON(btn.dataset.after);
+      modal.showModal();
+    });
+  });
+
+  btnClose.addEventListener('click', () => modal.close());
+  modal.addEventListener('click', e => { if (e.target === modal) modal.close(); });
+});
+</script>
+{% endblock %}

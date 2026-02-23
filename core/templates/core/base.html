@@ -33,6 +33,10 @@
             <a class="nav__link" href="{% url 'user_management' %}">Usuarios</a>
           {% endif %}
 
+          {% if perms.core.delete_resource %}
+            <a class="nav__link" href="{% url 'audit_log' %}">Audit Log</a>
+          {% endif %}
+
           <div class="nav__spacer" aria-hidden="true"></div>
 
           <a class="nav__link" href="{% url 'user_profile' %}">Perfil</a>
