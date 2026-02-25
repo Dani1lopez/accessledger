@@ -1,5 +1,5 @@
 from django.core.management.base import BaseCommand
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 from django.utils import timezone
 from datetime import timedelta
 from core.models import Resource, AccessGrant
@@ -11,9 +11,21 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         self.stdout.write("seed_data running...")
 
-        viewer1 = User.objects.get(username="viewer1")
-        editor1 = User.objects.get(username="editor1")
-        admin1  = User.objects.get(username="admin1")
+        viewer1, created = User.objects.get_or_create(username="viewer1")
+        if created:
+            viewer1.set_password("viewer1234!")
+            viewer1.groups.add(Group.objects.get(name="viewer"))
+            viewer1.save()
+        editor1, created = User.objects.get_or_create(username="editor1")
+        if created:
+            editor1.set_password("edit1234!")
+            editor1.groups.add(Group.objects.get(name="editor"))
+            editor1.save()
+        admin1, created = User.objects.get_or_create(username="admin1")
+        if created:
+            admin1.set_password("admin1234!")
+            admin1.groups.add(Group.objects.get(name="admin"))
+            admin1.save()
 
         now = timezone.now()
 
