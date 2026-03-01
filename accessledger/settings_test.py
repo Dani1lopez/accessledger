@@ -10,3 +10,5 @@ DATABASES = {
         "PORT": "5432",
     }
 }
+
+AXES_ENABLED = False

@@ -126,7 +126,6 @@ def resource_delete(request, pk):
             "url": resource.url,
             "is_active": resource.is_active,
         }
-        resource.delete()
         log_action(
             user=request.user,
             action=AuditLog.Action.RESOURCE_DELETED,
@@ -134,6 +133,7 @@ def resource_delete(request, pk):
             before=before,
             after=None
         )
+        resource.delete()
         is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
         return JsonResponse({"success": True}) if is_ajax else redirect("resource_list")
     else:
