@@ -151,4 +151,4 @@ AXES_LOCKOUT_CALLABLE = None
 AXES_LOCKOUT_TEMPLATE = 'axes/lockout.html'
 
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
