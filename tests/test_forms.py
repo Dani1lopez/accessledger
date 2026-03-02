@@ -1,7 +1,7 @@
 import pytest
 from django.utils import timezone
 from datetime import timedelta
-from core.forms import AccessGrantForm
+from core.forms import AccessGrantForm, ResourceForm
 from django.contrib.auth.models import User
 from core.models import Resource
 
@@ -54,3 +54,22 @@ class TestAccessGrantFormClean:
         assert not form.is_valid()
         assert "end_at" in form.errors
         assert "__all__" not in form.errors
+    
+    def test_end_at_equal_to_start_at_invalid(self, user, resource):
+        form = AccessGrantForm(data=grant_payload(user, resource, end_offset_hours=10, start_offset_hours=10))
+        assert not form.is_valid()
+        assert "__all__" in form.errors
+
+@pytest.mark.django_db
+class TestResourceForm:
+    def test_duplicate_name_is_invalid(self):
+        Resource.objects.create(
+            name="servidor-1",
+            resource_type="server",
+        )
+        form = ResourceForm(data={
+            "name": "servidor-1",
+            "resource_type": "server",
+            "environment": "dev",
+        })
+        assert form.is_valid() == False
