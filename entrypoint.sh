@@ -1,7 +1,7 @@
 #!/bin/sh
 set -ex
 echo "Collecting static files..."
-python manage.py collectstatic --noinput
+python manage.py collectstatic --noinput --clear
 echo "Aplicando migraciones..."
 python manage.py migrate --noinput
 echo "Arrancando servidor..."
