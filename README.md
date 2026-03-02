@@ -321,11 +321,30 @@ AccessLedger features a custom **dark theme UI** built entirely with native web 
 
 ---
 
+## 🧪 Testing
+
+The project includes a suite of 21 automated tests built with pytest-django, covering three layers:
+
+| Layer | File | Tests |
+|-------|------|-------|
+| Form validation | `tests/test_forms.py` | 7 |
+| Model logic & signals | `tests/test_models.py` | 4 |
+| View permissions (RBAC) | `tests/test_views.py` | 10 |
+
+Tests verify form edge cases (duplicate names, invalid date ranges), model `__str__` methods, the auto-creation of `Profile` via Django signals, and that each role (`viewer`, `editor`, `admin`) can only access the views their permissions allow.
+
+To run the test suite locally, you need PostgreSQL running and a `accessledger/settings_test.py` configured with your local database credentials:
+```bash
+pytest -v
+```
+
+---
+
 ## 🗺 Roadmap
 
 - [ ] Password change events in the audit log
 - [ ] REST API with Django REST Framework
-- [ ] Automated test suite (pytest-django)
+- [x] Automated test suite (pytest-django)
 - [ ] CI/CD pipeline with GitHub Actions
 - [ ] Email notifications for grants nearing expiration
 - [ ] Two-factor authentication (2FA)

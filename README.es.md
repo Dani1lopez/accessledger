@@ -321,11 +321,30 @@ AccessLedger cuenta con una interfaz de usuario con **tema oscuro** personalizad
 
 ---
 
+## 🧪 Tests
+
+El proyecto incluye una suite de 21 tests automatizados construida con pytest-django, cubriendo tres capas:
+
+| Capa | Archivo | Tests |
+|------|---------|-------|
+| Validación de formularios | `tests/test_forms.py` | 7 |
+| Lógica de modelos y señales | `tests/test_models.py` | 4 |
+| Permisos de vistas (RBAC) | `tests/test_views.py` | 10 |
+
+Los tests verifican casos borde en formularios (nombres duplicados, rangos de fechas inválidos), los métodos `__str__` de los modelos, la creación automática de `Profile` mediante señales de Django, y que cada rol (`viewer`, `editor`, `admin`) solo puede acceder a las vistas que sus permisos permiten.
+
+Para ejecutar los tests localmente necesitas PostgreSQL corriendo y un archivo `accessledger/settings_test.py` configurado con las credenciales de tu base de datos local:
+```bash
+pytest -v
+```
+
+---
+
 ## 🗺 Hoja de ruta
 
 - [ ] Registro de cambios de contraseña en el audit log
 - [ ] API REST con Django REST Framework
-- [ ] Suite de tests automatizados (pytest-django)
+- [x] Suite de tests automatizados (pytest-django)
 - [ ] Pipeline CI/CD con GitHub Actions
 - [ ] Notificaciones por email para grants próximos a expirar
 - [ ] Autenticación de dos factores (2FA)
