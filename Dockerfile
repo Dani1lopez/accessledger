@@ -11,4 +11,6 @@ RUN chmod +x entrypoint.sh
 
 EXPOSE 8080
 
+RUN sed -i 's/\r//' entrypoint.sh
+
 CMD ["sh", "./entrypoint.sh"]
