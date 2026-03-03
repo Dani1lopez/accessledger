@@ -8,10 +8,13 @@
 ![Django](https://img.shields.io/badge/Django-5.2-092E20?logo=django&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)
+![Railway](https://img.shields.io/badge/Deployed-Railway-8B5CF6?logo=railway&logoColor=white)
+
+🌐 [Live Demo](https://web-production-0ea6.up.railway.app)
 
 [🇬🇧 English version](README.md)
 
-[Funcionalidades](#-funcionalidades) · [Arquitectura](#-arquitectura) · [Inicio rápido](#-inicio-rápido) · [Seguridad](#-seguridad) · [Modelo de datos](#-modelo-de-datos) · [Hoja de ruta](#-hoja-de-ruta)
+[Funcionalidades](#-funcionalidades) · [Arquitectura](#-arquitectura) · [Inicio rápido](#-inicio-rápido) · [Seguridad](#-seguridad) · [Modelo de datos](#-modelo-de-datos) · [Despliegue](#-despliegue) · [Hoja de ruta](#-hoja-de-ruta)
 
 </div>
 
@@ -29,6 +32,7 @@
 - [Comandos de gestión](#-comandos-de-gestión)
 - [Seguridad](#-seguridad)
 - [Interfaz de usuario](#-interfaz-de-usuario)
+- [Despliegue](#-despliegue)
 - [Hoja de ruta](#-hoja-de-ruta)
 
 ---
@@ -248,6 +252,9 @@ cp .env.example .env
 | `POSTGRES_PASSWORD` | Contraseña de PostgreSQL              | _(obligatorio)_   |
 | `POSTGRES_HOST`     | Host de la base de datos              | `db`              |
 | `POSTGRES_PORT`     | Puerto de la base de datos            | `5432`            |
+| `SECRET_KEY`        | Clave secreta de Django               | _(obligatorio)_   |
+| `DEBUG`             | Activar modo depuración               | `False`           |
+| `ALLOWED_HOSTS`     | Hosts permitidos separados por comas  | _(obligatorio)_   |
 
 > [!CAUTION]
 > Nunca incluya el archivo `.env` en el control de versiones. El `.gitignore` ya está configurado para excluirlo.
@@ -294,6 +301,9 @@ La seguridad es una prioridad de primer nivel en AccessLedger. Se han implementa
 - **Aislamiento del entorno** — configuración sensible cargada desde `.env` (excluido del control de versiones)
 - **Imagen Docker mínima** — base `python:3.12-slim`, sin paquetes innecesarios
 - **Health checks de servicio** — Docker Compose espera a que PostgreSQL esté disponible antes de arrancar Django
+- **HTTPS forzado** — `SECURE_SSL_REDIRECT` redirige todo el tráfico a HTTPS
+- **HSTS habilitado** — cabecera HTTP Strict Transport Security configurada para 1 año
+- **Cookies seguras** — `SESSION_COOKIE_SECURE` y `CSRF_COOKIE_SECURE` activados en producción
 
 ---
 
@@ -340,6 +350,19 @@ pytest -v
 
 ---
 
+## 🚀 Despliegue
+
+| Elemento | Detalle |
+| -------- | ------- |
+| **Plataforma** | Railway |
+| **Auto-deploy** | En cada push a `main` |
+| **Base de datos** | PostgreSQL gestionado por Railway |
+| **Archivos estáticos** | Servidos por WhiteNoise |
+| **Servidor WSGI** | Gunicorn |
+| **Arranque** | Migraciones y `collectstatic` se ejecutan automáticamente al iniciar el contenedor mediante `entrypoint.sh` |
+
+---
+
 ## 🗺 Hoja de ruta
 
 - [ ] Registro de cambios de contraseña en el audit log
@@ -349,7 +372,7 @@ pytest -v
 - [ ] Notificaciones por email para grants próximos a expirar
 - [ ] Autenticación de dos factores (2FA)
 - [ ] Exportación del audit log (CSV / PDF)
-- [ ] Despliegue en producción (Railway / Render / AWS)
+- [x] Despliegue en producción en Railway
 
 ---
 

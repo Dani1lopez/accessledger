@@ -8,10 +8,13 @@
 ![Django](https://img.shields.io/badge/Django-5.2-092E20?logo=django&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)
+![Railway](https://img.shields.io/badge/Deployed-Railway-8B5CF6?logo=railway&logoColor=white)
+
+🌐 [Live Demo](https://web-production-0ea6.up.railway.app)
 
 [🇪🇸 Versión en español](README.es.md)
 
-[Features](#-features) · [Architecture](#-architecture) · [Quick Start](#-quick-start) · [Security](#-security) · [Data Model](#-data-model) · [Roadmap](#-roadmap)
+[Features](#-features) · [Architecture](#-architecture) · [Quick Start](#-quick-start) · [Security](#-security) · [Data Model](#-data-model) · [Deployment](#-deployment) · [Roadmap](#-roadmap)
 
 </div>
 
@@ -29,6 +32,7 @@
 - [Management Commands](#-management-commands)
 - [Security](#-security)
 - [UI Overview](#-ui-overview)
+- [Deployment](#-deployment)
 - [Roadmap](#-roadmap)
 
 ---
@@ -248,6 +252,9 @@ cp .env.example .env
 | `POSTGRES_PASSWORD` | PostgreSQL password      | _(required)_ |
 | `POSTGRES_HOST`     | Database host            | `db`         |
 | `POSTGRES_PORT`     | Database port            | `5432`       |
+| `SECRET_KEY`        | Django secret key        | _(required)_ |
+| `DEBUG`             | Enable debug mode        | `False`      |
+| `ALLOWED_HOSTS`     | Comma-separated allowed hosts | _(required)_ |
 
 > [!CAUTION]
 > Never commit your `.env` file to version control. The `.gitignore` is already configured to exclude it.
@@ -293,6 +300,9 @@ Security is a first-class concern in AccessLedger. The following measures are im
 
 - **Environment isolation** — sensitive configuration loaded from `.env` (excluded from version control)
 - **Minimal Docker image** — `python:3.12-slim` base, no unnecessary packages
+- **HTTPS enforced** — `SECURE_SSL_REDIRECT` ensures all traffic is redirected to HTTPS
+- **HSTS enabled** — HTTP Strict Transport Security header set for 1 year
+- **Secure cookie flags** — `SESSION_COOKIE_SECURE` and `CSRF_COOKIE_SECURE` enabled in production
 - **Service health checks** — Docker Compose waits for PostgreSQL readiness before starting Django
 
 ---
@@ -340,6 +350,19 @@ pytest -v
 
 ---
 
+## 🚀 Deployment
+
+| Item | Detail |
+| ---- | ------ |
+| **Platform** | Railway |
+| **Auto-deploy** | On every push to `main` |
+| **Database** | PostgreSQL managed by Railway |
+| **Static files** | Served by WhiteNoise |
+| **WSGI server** | Gunicorn |
+| **Startup** | Migrations and `collectstatic` run automatically on container start via `entrypoint.sh` |
+
+---
+
 ## 🗺 Roadmap
 
 - [ ] Password change events in the audit log
@@ -349,7 +372,7 @@ pytest -v
 - [ ] Email notifications for grants nearing expiration
 - [ ] Two-factor authentication (2FA)
 - [ ] Audit log export (CSV / PDF)
-- [ ] Production deployment (Railway / Render / AWS)
+- [x] Production deployment on Railway
 
 ---
 
