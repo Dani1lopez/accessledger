@@ -40,16 +40,12 @@ body {
   font-family: var(--font);
   color: var(--text);
   background:
-    radial-gradient(
-      900px 500px at 15% 5%,
+    radial-gradient(900px 500px at 15% 5%,
       rgba(110, 231, 255, 0.08),
-      transparent 60%
-    ),
-    radial-gradient(
-      800px 500px at 85% 10%,
+      transparent 60%),
+    radial-gradient(800px 500px at 85% 10%,
       rgba(167, 139, 250, 0.1),
-      transparent 55%
-    ),
+      transparent 55%),
     linear-gradient(180deg, var(--bg) 0%, var(--bg2) 100%);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -223,11 +219,9 @@ a {
 .card {
   border-radius: var(--radius);
   border: 1px solid var(--line);
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.03),
-    rgba(255, 255, 255, 0.015)
-  );
+  background: linear-gradient(180deg,
+      rgba(255, 255, 255, 0.03),
+      rgba(255, 255, 255, 0.015));
   box-shadow: var(--shadow);
   overflow: hidden;
 }
@@ -437,7 +431,7 @@ a {
 }
 
 /* ===== Topbar: username pill (ellipsis + responsive) ===== */
-.nav__user--pill{
+.nav__user--pill {
   display: inline-flex;
   align-items: center;
 
@@ -445,22 +439,25 @@ a {
   flex: 0 1 auto;
   min-width: 0;
 
-  max-width: 14rem;          /* ajusta si quieres */
+  max-width: 14rem;
+  /* ajusta si quieres */
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 
   padding: .25rem .6rem;
   border-radius: 999px;
-  border: 1px solid rgba(255,255,255,.16);
-  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255, 255, 255, .16);
+  background: rgba(255, 255, 255, .06);
   font-weight: 600;
   font-size: .9rem;
 }
 
 /* En móvil, un poco más estrecho para que no rompa */
-@media (max-width: 520px){
-  .nav__user--pill{ max-width: 9.5rem; }
+@media (max-width: 520px) {
+  .nav__user--pill {
+    max-width: 9.5rem;
+  }
 }
 
 
@@ -469,11 +466,35 @@ a {
 }
 
 /* ── AccessGrant badges ── */
-.badge--active  { border-color: rgba(110,231,255,.25); color: rgba(110,231,255,.9);  background: rgba(110,231,255,.06); }
-.badge--revoked { border-color: rgba(255,80,90,.25);   color: rgba(255,80,90,.85);   background: rgba(255,80,90,.06);  }
-.badge--expired { border-color: rgba(154,167,182,.25); color: rgba(154,167,182,.75); background: rgba(154,167,182,.04);}
-.badge--write   { border-color: rgba(167,139,250,.25); color: rgba(167,139,250,.9);  background: rgba(167,139,250,.06);}
-.badge--admin   { border-color: rgba(251,191,36,.25);  color: rgba(251,191,36,.9);   background: rgba(251,191,36,.06); }
+.badge--active {
+  border-color: rgba(110, 231, 255, .25);
+  color: rgba(110, 231, 255, .9);
+  background: rgba(110, 231, 255, .06);
+}
+
+.badge--revoked {
+  border-color: rgba(255, 80, 90, .25);
+  color: rgba(255, 80, 90, .85);
+  background: rgba(255, 80, 90, .06);
+}
+
+.badge--expired {
+  border-color: rgba(154, 167, 182, .25);
+  color: rgba(154, 167, 182, .75);
+  background: rgba(154, 167, 182, .04);
+}
+
+.badge--write {
+  border-color: rgba(167, 139, 250, .25);
+  color: rgba(167, 139, 250, .9);
+  background: rgba(167, 139, 250, .06);
+}
+
+.badge--admin {
+  border-color: rgba(251, 191, 36, .25);
+  color: rgba(251, 191, 36, .9);
+  background: rgba(251, 191, 36, .06);
+}
 
 /* ── Modal / Dialog ── */
 @keyframes modalIn {
@@ -481,6 +502,7 @@ a {
     opacity: 0;
     transform: translateY(12px) scale(0.97);
   }
+
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
@@ -490,11 +512,9 @@ a {
 dialog {
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 18px;
-  background: linear-gradient(
-    160deg,
-    rgba(17, 28, 40, 0.98),
-    rgba(11, 18, 28, 0.99)
-  );
+  background: linear-gradient(160deg,
+      rgba(17, 28, 40, 0.98),
+      rgba(11, 18, 28, 0.99));
   color: var(--text);
   padding: 0;
   width: 100%;
@@ -518,11 +538,9 @@ dialog::backdrop {
   align-items: center;
   padding: 22px 26px 18px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-  background: linear-gradient(
-    180deg,
-    rgba(110, 231, 255, 0.03),
-    transparent
-  );
+  background: linear-gradient(180deg,
+      rgba(110, 231, 255, 0.03),
+      transparent);
 }
 
 .modal__title {
@@ -737,13 +755,13 @@ dialog::backdrop {
   transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), background 0.2s ease;
 }
 
-.toggle input:checked ~ .toggle__track {
+.toggle input:checked~.toggle__track {
   background: rgba(110, 231, 255, 0.15);
   border-color: rgba(110, 231, 255, 0.35);
   box-shadow: 0 0 0 3px rgba(110, 231, 255, 0.08);
 }
 
-.toggle input:checked ~ .toggle__track .toggle__thumb {
+.toggle input:checked~.toggle__track .toggle__thumb {
   transform: translateX(18px);
   background: var(--accent);
 }
@@ -800,15 +818,15 @@ select option {
 }
 
 /* Animate to X when open */
-.nav__toggle:checked ~ .nav__hamburger .nav__hamburger-line:nth-child(1) {
+.nav__toggle:checked~.nav__hamburger .nav__hamburger-line:nth-child(1) {
   transform: translateY(7px) rotate(45deg);
 }
 
-.nav__toggle:checked ~ .nav__hamburger .nav__hamburger-line:nth-child(2) {
+.nav__toggle:checked~.nav__hamburger .nav__hamburger-line:nth-child(2) {
   opacity: 0;
 }
 
-.nav__toggle:checked ~ .nav__hamburger .nav__hamburger-line:nth-child(3) {
+.nav__toggle:checked~.nav__hamburger .nav__hamburger-line:nth-child(3) {
   transform: translateY(-7px) rotate(-45deg);
 }
 
@@ -877,7 +895,7 @@ select option {
     margin-top: 10px;
   }
 
-  .nav__toggle:checked ~ .nav {
+  .nav__toggle:checked~.nav {
     display: flex;
   }
 
@@ -902,11 +920,24 @@ select option {
     justify-content: center;
     max-width: 100%;
     width: 100%;
+    background: transparent;
+    border-color: transparent;
+    color: var(--muted);
+    font-size: 14px;
+    padding: 10px 12px;
+    border-radius: 10px;
   }
 
   .nav__user--pill {
     max-width: 100%;
     justify-content: center;
+    background: transparent;
+    border-color: transparent;
+    color: var(--muted);
+    font-size: 14px;
+    font-weight: 400;
+    padding: 10px 12px;
+    border-radius: 10px;
   }
 
   .nav__logout {
@@ -980,7 +1011,8 @@ select option {
   .modal__field input,
   .modal__field select,
   .modal__field textarea {
-    font-size: 16px; /* prevents iOS zoom on focus */
+    font-size: 16px;
+    /* prevents iOS zoom on focus */
   }
 
   /* -- Page -- */
