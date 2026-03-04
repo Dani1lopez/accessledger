@@ -21,6 +21,13 @@
           <span class="brand__name">AccessLedger</span>
         </div>
 
+        <input type="checkbox" id="nav-toggle" class="nav__toggle" aria-label="Abrir menú">
+        <label for="nav-toggle" class="nav__hamburger" aria-label="Menú de navegación">
+          <span class="nav__hamburger-line" aria-hidden="true"></span>
+          <span class="nav__hamburger-line" aria-hidden="true"></span>
+          <span class="nav__hamburger-line" aria-hidden="true"></span>
+        </label>
+
         <nav class="nav" aria-label="Navegación principal">
           {% if request.user.is_authenticated %}
           <a

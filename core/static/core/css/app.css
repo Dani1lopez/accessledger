@@ -762,3 +762,244 @@ select option {
   background: #0f1722;
   color: #e8eef6;
 }
+
+/* ===================================================================
+   RESPONSIVE — Hamburger toggle (CSS-only)
+   =================================================================== */
+.nav__toggle {
+  display: none;
+}
+
+.nav__hamburger {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  width: 36px;
+  height: 36px;
+  padding: 8px 6px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.nav__hamburger:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--line2);
+}
+
+.nav__hamburger-line {
+  display: block;
+  width: 100%;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--muted);
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+/* Animate to X when open */
+.nav__toggle:checked ~ .nav__hamburger .nav__hamburger-line:nth-child(1) {
+  transform: translateY(7px) rotate(45deg);
+}
+
+.nav__toggle:checked ~ .nav__hamburger .nav__hamburger-line:nth-child(2) {
+  opacity: 0;
+}
+
+.nav__toggle:checked ~ .nav__hamburger .nav__hamburger-line:nth-child(3) {
+  transform: translateY(-7px) rotate(-45deg);
+}
+
+/* ===================================================================
+   RESPONSIVE — Tablet (max-width: 768px)
+   =================================================================== */
+@media (max-width: 768px) {
+  .container {
+    width: calc(100% - 24px);
+  }
+
+  .hero {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .search {
+    min-width: 0;
+    width: 100%;
+  }
+
+  dialog {
+    max-width: 92vw;
+    margin: auto;
+  }
+
+  .modal__header {
+    padding: 18px 20px 14px;
+  }
+
+  .modal__body {
+    padding: 18px 20px 22px;
+  }
+
+  .card__header {
+    padding: 14px;
+    flex-wrap: wrap;
+  }
+
+  .page {
+    padding: 18px 0 40px;
+  }
+}
+
+/* ===================================================================
+   RESPONSIVE — Mobile (max-width: 480px)
+   =================================================================== */
+@media (max-width: 480px) {
+  .container {
+    width: calc(100% - 16px);
+  }
+
+  /* -- Hamburger visible, nav collapses -- */
+  .nav__hamburger {
+    display: flex;
+  }
+
+  .nav {
+    display: none;
+    flex-direction: column;
+    width: 100%;
+    gap: 4px;
+    padding-top: 10px;
+    border-top: 1px solid var(--line);
+    margin-top: 10px;
+  }
+
+  .nav__toggle:checked ~ .nav {
+    display: flex;
+  }
+
+  .topbar__inner {
+    flex-wrap: wrap;
+    padding: 10px 0;
+  }
+
+  .nav__link {
+    width: 100%;
+    text-align: center;
+    padding: 10px 12px;
+    font-size: 14px;
+    border-radius: 10px;
+  }
+
+  .nav__spacer {
+    display: none;
+  }
+
+  .nav__user {
+    justify-content: center;
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .nav__user--pill {
+    max-width: 100%;
+    justify-content: center;
+  }
+
+  .nav__logout {
+    width: 100%;
+  }
+
+  .nav__link--button {
+    width: 100%;
+    text-align: center;
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+
+  /* -- Hero -- */
+  .hero {
+    margin: 12px 0 14px;
+    gap: 10px;
+  }
+
+  .h1 {
+    font-size: clamp(22px, 5vw, 28px);
+  }
+
+  .muted {
+    font-size: 13px;
+  }
+
+  /* -- Search -- */
+  .search {
+    min-width: 0;
+    width: 100%;
+  }
+
+  /* -- Cards -- */
+  .card {
+    border-radius: 12px;
+  }
+
+  .card__header {
+    padding: 12px;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  /* -- Dialog / Modal -- */
+  dialog {
+    max-width: 98vw;
+    max-height: 92vh;
+    border-radius: 12px;
+    overflow-y: auto;
+  }
+
+  .modal__header {
+    padding: 16px 16px 12px;
+  }
+
+  .modal__body {
+    padding: 16px 16px 18px;
+  }
+
+  .modal__actions {
+    flex-wrap: wrap;
+  }
+
+  .modal__btn-submit,
+  .modal__btn-cancel {
+    flex: 1 1 100%;
+    text-align: center;
+  }
+
+  .modal__field input,
+  .modal__field select,
+  .modal__field textarea {
+    font-size: 16px; /* prevents iOS zoom on focus */
+  }
+
+  /* -- Page -- */
+  .page {
+    padding: 14px 0 32px;
+  }
+
+  /* -- Table: relies on .table-wrap overflow:auto already in base -- */
+  .table {
+    min-width: 480px;
+  }
+
+  .table thead th {
+    padding: 10px 12px;
+    font-size: 11px;
+  }
+
+  .table tbody td {
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+}
