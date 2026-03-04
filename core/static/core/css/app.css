@@ -757,3 +757,8 @@ dialog::backdrop {
 .toggle:has(input:checked) .toggle__label {
   color: var(--text);
 }
+
+select option {
+  background: #0f1722;
+  color: #e8eef6;
+}
