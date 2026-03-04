@@ -30,16 +30,19 @@
           >
 
           {% if perms.core.delete_resource %}
-            <a class="nav__link" href="{% url 'user_management' %}">Usuarios</a>
+            <a class="nav__link {% if request.resolver_match.url_name == 'user_management' %}nav__link--active{% endif %}"
+            href="{% url 'user_management' %}">Usuarios</a>
           {% endif %}
 
           {% if perms.core.delete_resource %}
-            <a class="nav__link" href="{% url 'audit_log' %}">Audit Log</a>
+            <a class="nav__link {% if request.resolver_match.url_name == 'audit_log' %}nav__link--active{% endif %}"
+            href="{% url 'audit_log' %}">Audit Log</a>
           {% endif %}
 
           <div class="nav__spacer" aria-hidden="true"></div>
 
-          <a class="nav__link" href="{% url 'user_profile' %}">Perfil</a>
+          <a class="nav__link {% if request.resolver_match.url_name == 'user_profile' %}nav__link--active{% endif %}"
+          href="{% url 'user_profile' %}">Perfil</a>
 
           <span
             class="nav__user nav__user--pill"
