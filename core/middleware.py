@@ -2,7 +2,7 @@ from typing import Any
 
 from django.shortcuts import redirect
 
-ALLOWED_PATHS = ["/password/change/", "/logout/"]
+ALLOWED_PATHS = ["/password/change/", "/logout/", "/login/", "/admin/"]
 
 class ForcePasswordChangeMiddleware:
     def __init__(self, get_response):
