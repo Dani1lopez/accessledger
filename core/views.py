@@ -185,30 +185,32 @@ def grant_create(request, resource_pk):
 def grant_revoke(request, pk):
     grant = get_object_or_404(AccessGrant, pk=pk)
     if request.method == "POST":
+        before = {
+            "user": grant.user.username,
+            "resource": grant.resource.name,
+            "access_level": grant.access_level,
+            "status": grant.status,
+            "start_at": grant.start_at.isoformat(),
+            "end_at": grant.end_at.isoformat() if grant.end_at else None,
+            "notes": grant.notes,
+        }
         grant.status = AccessGrant.Status.REVOKED
         grant.save()
+        after = {
+            "user": grant.user.username,
+            "resource": grant.resource.name,
+            "access_level": grant.access_level,
+            "status": grant.status,
+            "start_at": grant.start_at.isoformat(),
+            "end_at": grant.end_at.isoformat() if grant.end_at else None,
+            "notes": grant.notes,
+        }
         log_action(
             user=request.user,
             action=AuditLog.Action.GRANT_REVOKED,
             obj=grant,
-            before={
-                "user": grant.user.username,
-                "resource": grant.resource.name,
-                "access_level": grant.access_level,
-                "status": "active",
-                "start_at": grant.start_at.isoformat(),
-                "end_at": grant.end_at.isoformat(),
-                "notes": grant.notes
-            },
-            after={
-                "user": grant.user.username,
-                "resource": grant.resource.name,
-                "access_level": grant.access_level,
-                "status": "revoked",
-                "start_at": grant.start_at.isoformat(),
-                "end_at": grant.end_at.isoformat(),
-                "notes": grant.notes
-            }
+            before=before,
+            after=after,
         )
         return redirect("resource_detail", pk=grant.resource.pk)
     else:

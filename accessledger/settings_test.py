@@ -1,3 +1,5 @@
+import os
+
 from .settings import *
 
 DATABASES = {
@@ -7,7 +9,7 @@ DATABASES = {
         "USER": "danidev_dj",
         "PASSWORD": "12345_dj",
         "HOST": "127.0.0.1",
-        "PORT": "5432",
+        "PORT": os.getenv("POSTGRES_HOST_PORT", "5434"),
     }
 }
 
