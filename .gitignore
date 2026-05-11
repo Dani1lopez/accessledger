@@ -76,6 +76,10 @@ Icon?
 .Spotlight-V100
 .Trashes
 
+# --- Agent / AI ---
+.atl/
+openspec/
+
 # --- Docker ---
 **/.dockerignore
 *.pid

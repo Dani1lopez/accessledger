@@ -46,7 +46,7 @@ class TestResourceDeleteView:
         )
         response = editor_client.post(
             f"/resources/{resource.pk}/delete/",
-            HTTP_X_REQUESTED_WITH="XMLHtppRequest"
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest"
         )
         assert response.status_code == 403
     
