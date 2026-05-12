@@ -126,3 +126,56 @@ class TestGrantRevokeView:
         )
         response = admin_client.post(f"/grants/{grant.pk}/revoke")
         assert response.status_code == 302
+
+@pytest.mark.django_db
+class TestUserCreateView:
+    def test_non_ajax_get_redirects_to_user_management(self, admin_client):
+        """Direct GET should redirect to user_management instead of 500."""
+        response = admin_client.get("/users/create/")
+        assert response.status_code == 302
+        assert response.url == "/users/manage/"
+
+    def test_non_admin_cannot_access(self, viewer_client):
+        response = viewer_client.get("/users/create/")
+        assert response.status_code == 403
+
+    def test_ajax_get_returns_405(self, admin_client):
+        response = admin_client.get(
+            "/users/create/", HTTP_X_REQUESTED_WITH="XMLHttpRequest"
+        )
+        assert response.status_code == 405
+
+    def test_ajax_post_creates_user(self, admin_client):
+        group = Group.objects.create(name="test-group")
+        response = admin_client.post("/users/create/", data={
+            "username": "newuser",
+            "email": "new@test.com",
+            "first_name": "New",
+            "last_name": "User",
+            "password": "testpass123",
+            "role": group.pk,
+        }, HTTP_X_REQUESTED_WITH="XMLHttpRequest")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+
+@pytest.mark.django_db
+class TestUserUpdateView:
+    def test_non_ajax_get_redirects_to_user_management(self, admin_client):
+        """Direct GET should redirect to user_management instead of 500."""
+        user = User.objects.create_user(username="targetuser", password="pass")
+        response = admin_client.get(f"/users/{user.pk}/edit/")
+        assert response.status_code == 302
+        assert response.url == "/users/manage/"
+
+    def test_non_admin_cannot_access(self, viewer_client):
+        user = User.objects.create_user(username="targetuser", password="pass")
+        response = viewer_client.get(f"/users/{user.pk}/edit/")
+        assert response.status_code == 403
+
+    def test_ajax_get_returns_405(self, admin_client):
+        user = User.objects.create_user(username="targetuser", password="pass")
+        response = admin_client.get(
+            f"/users/{user.pk}/edit/", HTTP_X_REQUESTED_WITH="XMLHttpRequest"
+        )
+        assert response.status_code == 405

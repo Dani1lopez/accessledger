@@ -299,10 +299,7 @@ def user_create(request):
     elif is_ajax:
         return HttpResponseNotAllowed(["POST"])
     else:
-        form = UserForm()
-    return render(request, "core/user_create.html", {
-        "form": form
-    })
+        return redirect("user_management")
 
 @login_required
 @admin_required
@@ -358,11 +355,7 @@ def user_update(request, pk):
     elif is_ajax:
         return HttpResponseNotAllowed(["POST"])
     else:
-        form = UserForm()
-    return render(request, "core/user_update.html", {
-        "user": user,
-        "form": form
-    })
+        return redirect("user_management")
 
 @login_required
 @admin_required
