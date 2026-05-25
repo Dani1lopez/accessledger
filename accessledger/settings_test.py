@@ -5,6 +5,8 @@ from dotenv import load_dotenv
 
 load_dotenv(BASE_DIR / ".env.test", override=True)
 
+SECRET_KEY = os.getenv("SECRET_KEY", "django-insecure-test-key-ci-only")
+
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
