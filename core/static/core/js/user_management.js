@@ -1,3 +1,38 @@
+// ── Búsqueda en tabla de usuarios ──────────────────────────────────────────
+(() => {
+  const q = document.getElementById("q");
+  const table = document.getElementById("usersTable");
+  const pill = document.getElementById("countPill");
+
+  if (!table || !pill) return;
+  if (!q) return;
+
+  const rows = Array.from(table.querySelectorAll("tbody tr.row"));
+
+  const setCount = (n) => {
+    pill.textContent = `${n} usuario${n === 1 ? "" : "s"}`;
+  };
+
+  const filter = (value) => {
+    const term = value.trim().toLowerCase();
+    let visible = 0;
+
+    rows.forEach((tr) => {
+      const text = tr.innerText.toLowerCase();
+      const show = term === "" || text.includes(term);
+      tr.style.display = show ? "" : "none";
+      if (show) visible += 1;
+    });
+
+    setCount(visible);
+  };
+
+  // Initial count
+  if (rows.length > 0) setCount(rows.length);
+
+  q.addEventListener("input", (e) => filter(e.target.value));
+})();
+
 // Obtiene el CSRF token de las cookies
 function getCsrfToken() {
   const match = document.cookie.match(/csrftoken=([^;]+)/);
