@@ -1,7 +1,7 @@
 from axes import admin
 import pytest
 from django.contrib.auth.models import User, Group, Permission
-from core.models import Resource, AccessGrant
+from core.models import Resource, AccessGrant, AuditLog
 from django.utils import timezone
 from datetime import timedelta
 
@@ -148,6 +148,147 @@ class TestAuditLogView:
     def test_admin_can_access(self, admin_client):
         response = admin_client.get("/audit_log/")
         assert response.status_code == 200
+
+    # ── Audit log detail modal diff tests ──
+
+    def test_create_action_renders_diff_table(self, admin_client):
+        """Create action: diff table present, no old pre blocks, data attrs correct."""
+        AuditLog.objects.create(
+            user=None,
+            action="resource_created",
+            object_type="Resource",
+            object_id=1,
+            object_repr="test-server",
+            before=None,
+            after={"name": "test-server", "resource_type": "server"},
+        )
+        response = admin_client.get("/audit_log/")
+        assert response.status_code == 200
+        content = response.content.decode()
+
+        # Diff table exists
+        assert '<table class="diff-table"' in content
+
+        # No old <pre> blocks
+        assert 'id="detailBefore"' not in content
+        assert 'id="detailAfter"' not in content
+
+        # Data attributes present
+        assert 'data-before=' in content
+        assert 'data-after=' in content
+
+        # parseSnapshot reference exists in JS
+        assert 'parseSnapshot' in content
+
+    def test_delete_action_data_attributes(self, admin_client):
+        """Delete action: data-before has content, data-after is empty."""
+        AuditLog.objects.create(
+            user=None,
+            action="resource_deleted",
+            object_type="Resource",
+            object_id=2,
+            object_repr="old-resource",
+            before={"name": "old-resource", "resource_type": "database"},
+            after=None,
+        )
+        response = admin_client.get("/audit_log/")
+        assert response.status_code == 200
+        content = response.content.decode()
+
+        # Diff table structure present
+        assert '<table class="diff-table"' in content
+        assert 'id="detailBefore"' not in content
+        assert 'id="detailAfter"' not in content
+
+        # data-before contains field data (Python repr in template)
+        assert "data-before=" in content
+        assert "data-after=" in content
+
+    def test_update_action_shows_only_changed_fields(self, admin_client):
+        """Update action: both data-before and data-after present, computeDiff reference exists."""
+        AuditLog.objects.create(
+            user=None,
+            action="resource_updated",
+            object_type="Resource",
+            object_id=3,
+            object_repr="updated-resource",
+            before={"name": "old-name", "resource_type": "server", "environment": "dev"},
+            after={"name": "new-name", "resource_type": "server", "environment": "prod"},
+        )
+        response = admin_client.get("/audit_log/")
+        assert response.status_code == 200
+        content = response.content.decode()
+
+        # Diff table and JS functions present
+        assert '<table class="diff-table"' in content
+        assert 'computeDiff' in content
+        assert 'renderDiffTable' in content
+
+        # Data attributes contain both before and after
+        assert "data-before=" in content
+        assert "data-after=" in content
+
+    def test_no_changes_shows_empty_state(self, admin_client):
+        """Identical before/after: diff table still present, empty state handled by JS."""
+        AuditLog.objects.create(
+            user=None,
+            action="resource_updated",
+            object_type="Resource",
+            object_id=4,
+            object_repr="unchanged-resource",
+            before={"name": "same", "type": "server"},
+            after={"name": "same", "type": "server"},
+        )
+        response = admin_client.get("/audit_log/")
+        assert response.status_code == 200
+        content = response.content.decode()
+
+        # Diff table structure exists (JS shows empty state message on click)
+        assert '<table class="diff-table"' in content
+        assert '"No hay cambios para mostrar"' in content or "No hay cambios" in content
+
+    # ── Triangulation: edge cases ──
+
+    def test_create_entry_data_before_is_empty(self, admin_client):
+        """Create action with null before: data-before attribute is empty string."""
+        AuditLog.objects.create(
+            user=None,
+            action="resource_created",
+            object_type="Resource",
+            object_id=5,
+            object_repr="fresh-resource",
+            before=None,
+            after={"name": "fresh", "env": "prod"},
+        )
+        response = admin_client.get("/audit_log/")
+        content = response.content.decode()
+
+        # The data-before attribute on the create entry should be empty
+        assert 'data-before=""' in content or "data-before=''" in content
+
+    def test_update_entry_data_attrs_contain_field_values(self, admin_client):
+        """Update action: both data-before and data-after contain differing values."""
+        AuditLog.objects.create(
+            user=None,
+            action="grant_created",
+            object_type="AccessGrant",
+            object_id=6,
+            object_repr="test-user → resource (read)",
+            before={"access_level": "none", "status": "inactive"},
+            after={"access_level": "read", "status": "active"},
+        )
+        response = admin_client.get("/audit_log/")
+        content = response.content.decode()
+
+        # Verify data attributes exist with content (not empty)
+        # Django renders JSONField as Python repr: {'key': 'val'}
+        assert 'data-before=' in content
+        assert 'data-after=' in content
+        # The old value "none" and new value "read" should appear in the page
+        assert 'none' in content
+        assert 'active' in content
+        # Diff table structure present
+        assert '<table class="diff-table"' in content
 
 
 @pytest.mark.django_db
