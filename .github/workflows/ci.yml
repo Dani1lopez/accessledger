@@ -33,7 +33,7 @@ jobs:
       - name: Run test
         env:
           DJANGO_SETTINGS_MODULE: accessledger.settings_test
-          POSTGRES_HOST: postgres
+          POSTGRES_HOST: localhost
           POSTGRES_PORT: "5432"
           POSTGRES_DB: accessledger
           POSTGRES_USER: postgres
