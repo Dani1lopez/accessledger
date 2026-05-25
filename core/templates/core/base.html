@@ -9,6 +9,7 @@
 
     <link rel="stylesheet" href="{% static 'core/css/app.css' %}" />
     {% block extra_css %}{% endblock %}
+    <script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js" defer></script>
   </head>
 
   <body>
@@ -32,22 +33,34 @@
           {% if request.user.is_authenticated %}
             <a
               class="nav__link {% if request.resolver_match.url_name == 'resource_list' or request.resolver_match.url_name == 'resource_detail' %}nav__link--active{% endif %}"
+              hx-get="{% url 'resource_list' %}"
+              hx-target="#main"
+              hx-push-url="true"
               href="{% url 'resource_list' %}"
             >Resources</a>
 
             {% if perms.core.delete_resource %}
               <a class="nav__link {% if request.resolver_match.url_name == 'user_management' %}nav__link--active{% endif %}"
-                 href="{% url 'user_management' %}">Usuarios</a>
+                 hx-get="{% url 'user_management' %}"
+                 hx-target="#main"
+                 hx-push-url="true"
+                href="{% url 'user_management' %}">Usuarios</a>
             {% endif %}
 
             {% if perms.core.delete_resource %}
               <a class="nav__link {% if request.resolver_match.url_name == 'audit_log' %}nav__link--active{% endif %}"
+                 hx-get="{% url 'audit_log' %}"
+                 hx-target="#main"
+                 hx-push-url="true"
                  href="{% url 'audit_log' %}">Audit Log</a>
             {% endif %}
 
             <div class="nav__spacer" aria-hidden="true"></div>
 
             <a class="nav__link {% if request.resolver_match.url_name == 'user_profile' %}nav__link--active{% endif %}"
+               hx-get="{% url 'user_profile' %}"
+               hx-target="#main"
+               hx-push-url="true"
                href="{% url 'user_profile' %}">Perfil</a>
 
             <span
