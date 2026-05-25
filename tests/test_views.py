@@ -126,3 +126,22 @@ class TestGrantRevokeView:
         )
         response = admin_client.post(f"/grants/{grant.pk}/revoke")
         assert response.status_code == 302
+
+
+@pytest.mark.django_db
+class TestAuditLogView:
+    def test_redirects_if_not_logged_in(self, client):
+        response = client.get("/audit_log/")
+        assert response.status_code == 302
+
+    def test_viewer_cannot_access(self, viewer_client):
+        response = viewer_client.get("/audit_log/")
+        assert response.status_code == 403
+
+    def test_editor_cannot_access(self, editor_client):
+        response = editor_client.get("/audit_log/")
+        assert response.status_code == 403
+
+    def test_admin_can_access(self, admin_client):
+        response = admin_client.get("/audit_log/")
+        assert response.status_code == 200
