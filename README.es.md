@@ -32,6 +32,7 @@
 - [Comandos de gestión](#-comandos-de-gestión)
 - [Seguridad](#-seguridad)
 - [Interfaz de usuario](#-interfaz-de-usuario)
+- [Tests](#-tests)
 - [Despliegue](#-despliegue)
 - [Hoja de ruta](#-hoja-de-ruta)
 
@@ -259,6 +260,23 @@ cp .env.example .env
 > [!CAUTION]
 > Nunca incluya el archivo `.env` en el control de versiones. El `.gitignore` ya está configurado para excluirlo.
 
+### Entorno de tests
+
+Los tests pueden usar un archivo `.env.test` separado para que la configuración de la aplicación y la configuración de pruebas no se pisen entre sí. Esto es especialmente útil al ejecutar tests dentro de Docker, donde el host de la base de datos es `db` y el puerto interno de PostgreSQL es `5432`.
+
+Crear `.env.test` localmente:
+
+```env
+POSTGRES_DB=accessledger
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=
+POSTGRES_HOST=db
+POSTGRES_PORT=5432
+```
+
+> [!NOTE]
+> `POSTGRES_HOST_PORT` solo sirve para conectarse desde la máquina host hacia Docker, por ejemplo `localhost:5434`. Los contenedores deben conectarse a PostgreSQL mediante `db:5432`.
+
 ---
 
 ## ⚙️ Comandos de gestión
@@ -333,19 +351,36 @@ AccessLedger cuenta con una interfaz de usuario con **tema oscuro** personalizad
 
 ## 🧪 Tests
 
-El proyecto incluye una suite de 21 tests automatizados construida con pytest-django, cubriendo tres capas:
+El proyecto incluye una suite de 22 tests automatizados construida con pytest-django, cubriendo tres capas:
 
 | Capa | Archivo | Tests |
 |------|---------|-------|
 | Validación de formularios | `tests/test_forms.py` | 7 |
 | Lógica de modelos y señales | `tests/test_models.py` | 4 |
-| Permisos de vistas (RBAC) | `tests/test_views.py` | 10 |
+| Permisos de vistas y flujos de usuario | `tests/test_views.py` | 11 |
 
 Los tests verifican casos borde en formularios (nombres duplicados, rangos de fechas inválidos), los métodos `__str__` de los modelos, la creación automática de `Profile` mediante señales de Django, y que cada rol (`viewer`, `editor`, `admin`) solo puede acceder a las vistas que sus permisos permiten.
 
-Para ejecutar los tests localmente necesitas PostgreSQL corriendo y un archivo `accessledger/settings_test.py` configurado con las credenciales de tu base de datos local:
+### Recomendado: ejecutar tests dentro de Docker
+
+Docker Compose permite que el proceso de tests acceda al servicio PostgreSQL como `db:5432`, coincidiendo con el ejemplo de `.env.test` anterior:
+
 ```bash
-pytest -v
+docker compose run --rm web pytest -v
+```
+
+Ejecutar solo los tests de creación de usuarios:
+
+```bash
+docker compose run --rm web pytest tests/test_views.py -k "UserCreate"
+```
+
+### Alternativa con Python local
+
+Si ejecutás pytest directamente desde tu máquina host, recordá que `db` es un hostname exclusivo de Docker. Sobrescribí el host y el puerto de la base de datos para tu entorno local:
+
+```bash
+POSTGRES_HOST=127.0.0.1 POSTGRES_PORT=5434 pytest -v
 ```
 
 ---

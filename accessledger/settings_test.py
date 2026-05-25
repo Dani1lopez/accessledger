@@ -1,6 +1,9 @@
 import os
 
 from .settings import *
+from dotenv import load_dotenv
+
+load_dotenv(BASE_DIR / ".env.test", override=True)
 
 DATABASES = {
     "default": {

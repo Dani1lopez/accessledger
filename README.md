@@ -32,6 +32,7 @@
 - [Management Commands](#-management-commands)
 - [Security](#-security)
 - [UI Overview](#-ui-overview)
+- [Testing](#-testing)
 - [Deployment](#-deployment)
 - [Roadmap](#-roadmap)
 
@@ -259,6 +260,23 @@ cp .env.example .env
 > [!CAUTION]
 > Never commit your `.env` file to version control. The `.gitignore` is already configured to exclude it.
 
+### Test environment
+
+Tests can use a separate `.env.test` file so the application config and test config do not fight each other. This is especially useful when running tests inside Docker, where the database host is `db` and the internal PostgreSQL port is `5432`.
+
+Create `.env.test` locally:
+
+```env
+POSTGRES_DB=accessledger
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=
+POSTGRES_HOST=db
+POSTGRES_PORT=5432
+```
+
+> [!NOTE]
+> `POSTGRES_HOST_PORT` is only for connecting from your host machine to Docker, for example `localhost:5434`. Containers should connect to PostgreSQL through `db:5432`.
+
 ---
 
 ## ⚙️ Management Commands
@@ -333,19 +351,36 @@ AccessLedger features a custom **dark theme UI** built entirely with native web 
 
 ## 🧪 Testing
 
-The project includes a suite of 21 automated tests built with pytest-django, covering three layers:
+The project includes a suite of 22 automated tests built with pytest-django, covering three layers:
 
 | Layer | File | Tests |
 |-------|------|-------|
 | Form validation | `tests/test_forms.py` | 7 |
 | Model logic & signals | `tests/test_models.py` | 4 |
-| View permissions (RBAC) | `tests/test_views.py` | 10 |
+| View permissions and user flows | `tests/test_views.py` | 11 |
 
 Tests verify form edge cases (duplicate names, invalid date ranges), model `__str__` methods, the auto-creation of `Profile` via Django signals, and that each role (`viewer`, `editor`, `admin`) can only access the views their permissions allow.
 
-To run the test suite locally, you need PostgreSQL running and a `accessledger/settings_test.py` configured with your local database credentials:
+### Recommended: run tests inside Docker
+
+Docker Compose gives the test process access to the PostgreSQL service as `db:5432`, matching the `.env.test` example above:
+
 ```bash
-pytest -v
+docker compose run --rm web pytest -v
+```
+
+Run only the user creation tests:
+
+```bash
+docker compose run --rm web pytest tests/test_views.py -k "UserCreate"
+```
+
+### Local Python alternative
+
+If you run pytest directly from your host machine, remember that `db` is a Docker-only hostname. Override the database host and port for your local environment:
+
+```bash
+POSTGRES_HOST=127.0.0.1 POSTGRES_PORT=5434 pytest -v
 ```
 
 ---
