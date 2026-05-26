@@ -177,8 +177,8 @@ class TestAuditLogView:
         assert 'data-before=' in content
         assert 'data-after=' in content
 
-        # parseSnapshot reference exists in JS
-        assert 'parseSnapshot' in content
+        # delegated.js loaded (parseSnapshot/computeDiff now live there)
+        assert 'delegated.js' in content
 
     def test_delete_action_data_attributes(self, admin_client):
         """Delete action: data-before has content, data-after is empty."""
@@ -219,10 +219,9 @@ class TestAuditLogView:
         assert response.status_code == 200
         content = response.content.decode()
 
-        # Diff table and JS functions present
+        # Diff table and delegated.js present (functions moved there)
         assert '<table class="diff-table"' in content
-        assert 'computeDiff' in content
-        assert 'renderDiffTable' in content
+        assert 'delegated.js' in content
 
         # Data attributes contain both before and after
         assert "data-before=" in content
@@ -308,13 +307,14 @@ class TestAuditLogView:
         content = response.content.decode()
         assert "<html" not in content
 
-    def test_htmx_partial_includes_modal_js(self, admin_client):
-        """HTMX partial includes inline modal JS for re-initialization."""
+    def test_htmx_partial_no_inline_script(self, admin_client):
+        """HTMX partial no longer contains inline script — JS lives in delegated.js (base.html)."""
         response = admin_client.get("/audit_log/", HTTP_HX_REQUEST="true")
         assert response.status_code == 200
         content = response.content.decode()
-        assert "parseSnapshot" in content
-        assert "computeDiff" in content
+        assert '<dialog id="modalAuditDetail"' in content
+        assert '.btn-detail' in content
+        assert '<script' not in content
 
     def test_normal_request_returns_full_page(self, admin_client):
         """Non-HTMX request returns full page with base template."""
