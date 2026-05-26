@@ -91,7 +91,7 @@ class AuditLog(models.Model):
     object_repr = models.CharField(max_length=80)
     before = models.JSONField(null=True, blank=True)
     after = models.JSONField(null=True, blank=True)
-    timestamp = models.DateTimeField(auto_now_add=True)
+    timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
     
     def __str__(self):
         return f"{self.action} -> {self.object_type} -> {self.timestamp}" 

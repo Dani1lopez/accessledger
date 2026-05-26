@@ -308,13 +308,23 @@ class TestAuditLogView:
         assert "<html" not in content
 
     def test_htmx_partial_no_inline_script(self, admin_client):
-        """HTMX partial no longer contains inline script — JS lives in delegated.js (base.html)."""
+        """HTMX partial no longer contains inline style/script — CSS lives in external files."""
+        AuditLog.objects.create(
+            user=None,
+            action="resource_created",
+            object_type="Resource",
+            object_id=99,
+            object_repr="test-css",
+            before=None,
+            after={"name": "test-css"},
+        )
         response = admin_client.get("/audit_log/", HTTP_HX_REQUEST="true")
         assert response.status_code == 200
         content = response.content.decode()
         assert '<dialog id="modalAuditDetail"' in content
-        assert '.btn-detail' in content
+        assert 'class="btn-detail"' in content
         assert '<script' not in content
+        assert '<style' not in content
 
     def test_normal_request_returns_full_page(self, admin_client):
         """Non-HTMX request returns full page with base template."""
