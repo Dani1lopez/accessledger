@@ -1,142 +1,10 @@
-<style>
-  .status-dot {
-    display: inline-block;
-    width: 7px;
-    height: 7px;
-    border-radius: 999px;
-    margin-right: 6px;
-    vertical-align: middle;
-  }
-
-  .status-dot--active {
-    background: var(--accent);
-    box-shadow: 0 0 6px rgba(110, 231, 255, 0.5);
-  }
-
-  .status-dot--inactive {
-    background: rgba(154, 167, 182, 0.4);
-  }
-
-  .actions {
-    display: flex;
-    gap: 8px;
-  }
-
-  .btn-action {
-    padding: 5px 12px;
-    border-radius: 8px;
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-    border: 1px solid var(--line);
-    background: rgba(255, 255, 255, 0.03);
-    color: var(--muted);
-    transition:
-      color 0.15s ease,
-      border-color 0.15s ease,
-      background 0.15s ease;
-    text-decoration: none;
-  }
-
-  .btn-action:hover {
-    color: var(--text);
-    border-color: var(--line2);
-    background: rgba(255, 255, 255, 0.06);
-  }
-
-  .btn-action--danger {
-    border-color: rgba(255, 80, 90, 0.2);
-    color: rgba(255, 80, 90, 0.7);
-    background: rgba(255, 80, 90, 0.04);
-  }
-
-  .btn-action--danger:hover {
-    border-color: rgba(255, 80, 90, 0.4);
-    color: rgba(255, 80, 90, 0.95);
-    background: rgba(255, 80, 90, 0.08);
-  }
-
-  .btn-action--success {
-    border-color: rgba(110, 231, 255, 0.2);
-    color: rgba(110, 231, 255, 0.7);
-    background: rgba(110, 231, 255, 0.04);
-  }
-
-  .btn-action--success:hover {
-    border-color: rgba(110, 231, 255, 0.4);
-    color: rgba(110, 231, 255, 0.95);
-    background: rgba(110, 231, 255, 0.08);
-  }
-
-  /* Ajustes modal crear usuario */
-  #modalCreateUser .modal__body {
-    padding-bottom: 8px;
-  }
-
-  #modalCreateUser .modal__field {
-    margin-bottom: 12px;
-  }
-
-  #modalCreateUser .modal__actions {
-    padding: 14px 26px 20px;
-    margin-top: 0;
-  }
-
-  /* Ajustes modal editar usuario */
-  #modalEditUser .modal__body {
-    padding-bottom: 8px;
-  }
-
-  #modalEditUser .modal__field {
-    margin-bottom: 12px;
-  }
-
-  #modalEditUser .modal__actions {
-    padding: 14px 26px 20px;
-    margin-top: 0;
-  }
-
-  /* Label opcional */
-  .modal__optional {
-    color: rgba(154, 167, 182, 0.45);
-    font-size: 10px;
-    font-weight: 400;
-    text-transform: none;
-    letter-spacing: 0;
-    margin-left: 4px;
-  }
-
-  /* ===================================================================
-     RESPONSIVE — Mobile (max-width: 480px)
-     =================================================================== */
-  @media (max-width: 480px) {
-    .actions {
-      flex-wrap: wrap;
-      gap: 6px;
-    }
-
-    .btn-action {
-      flex: 1 1 100%;
-      text-align: center;
-      padding: 8px 12px;
-    }
-
-    #modalCreateUser .modal__actions,
-    #modalEditUser .modal__actions {
-      padding: 12px 16px 16px;
-    }
-  }
-</style>
 
 <section class="hero">
   <div class="hero__left">
     <h1 class="h1">Gestión de usuarios</h1>
     <p class="muted">Administra cuentas, roles y accesos del sistema.</p>
   </div>
-  <div
-    class="hero__right"
-    style="display: flex; align-items: center; gap: 12px"
-  >
+  <div class="hero__right">
     <div class="search" role="search">
       <label class="sr-only" for="q">Buscar</label>
       <input
@@ -150,17 +18,7 @@
     </div>
     <button
       id="btnNewUser"
-      style="
-        padding: 6px 14px;
-        border-radius: 6px;
-        background: var(--accent);
-        color: #0b0f14;
-        font-size: 13px;
-        font-weight: 600;
-        border: none;
-        cursor: pointer;
-        white-space: nowrap;
-      "
+      class="btn-new-user"
     >
       + Nuevo usuario
     </button>
@@ -194,21 +52,12 @@
           <td>{{ u.email|default:"—" }}</td>
           <td>
             {% for group in u.groups.all %}
-            <span
-              class="badge badge--role"
-              style="
-                border-color: rgba(167, 139, 250, 0.25);
-                color: rgba(167, 139, 250, 0.9);
-                background: rgba(167, 139, 250, 0.06);
-                text-transform: capitalize;
-              "
-              >{{ group.name }}</span
-            >
+            <span class="badge badge--role">{{ group.name }}</span>
             {% empty %}
-            <span class="badge" style="color: var(--muted)">Sin rol</span>
+            <span class="badge badge--muted">Sin rol</span>
             {% endfor %}
           </td>
-          <td style="color: var(--muted); font-size: 13px">
+          <td class="muted last-login-cell">
             {% if u.last_login %}{{ u.last_login|date:"d M Y, H:i" }}{% else
             %}—{% endif %}
           </td>
@@ -218,7 +67,7 @@
               <span class="status-dot status-dot--active"></span>Activo
             </span>
             {% else %}
-            <span class="badge" style="color: var(--muted)">
+            <span class="badge badge--muted">
               <span class="status-dot status-dot--inactive"></span>Inactivo
             </span>
             {% endif %}
@@ -274,8 +123,7 @@
     <div class="modal__body">
       <div
         id="createUserErrors"
-        class="modal__errors"
-        style="display: none"
+        class="modal__errors hidden"
       ></div>
 
       <div class="modal__field">
@@ -344,8 +192,7 @@
     <div class="modal__body">
       <div
         id="editUserErrors"
-        class="modal__errors"
-        style="display: none"
+        class="modal__errors hidden"
       ></div>
       <div class="modal__field">
         <label class="modal__label" for="edit_username"
