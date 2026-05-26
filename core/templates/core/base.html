@@ -8,6 +8,9 @@
     <title>{% block title %}AccessLedger{% endblock %}</title>
 
     <link rel="stylesheet" href="{% static 'core/css/app.css' %}" />
+    {% if perms.core.delete_resource %}
+    <link rel="stylesheet" href="{% static 'core/css/audit_log.css' %}">
+    {% endif %}
     {% block extra_css %}{% endblock %}
     <script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js" defer></script>
   </head>
