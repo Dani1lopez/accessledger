@@ -1,0 +1,233 @@
+<section class="hero">
+  <div class="hero__left">
+    <h1 class="h1">Resources</h1>
+    <p class="muted">Inventario de activos (repos, servidores, SaaS…). Vista de lectura.</p>
+  </div>
+
+  <div class="hero__right" style="display:flex; align-items:center; gap:12px;">
+    <div class="search" role="search">
+      <label class="sr-only" for="q">Buscar</label>
+      <input id="q" class="search__input" type="search" placeholder="Buscar por nombre…" autocomplete="off">
+      <span class="search__kbd" aria-hidden="true">⌘K</span>
+    </div>
+    {% if perms.core.add_resource %}
+      <button id="btnNewResource"
+              style="padding:6px 14px; border-radius:6px; background:var(--accent); color:#0b0f14; font-size:13px; font-weight:600; border:none; cursor:pointer; white-space:nowrap;">
+        + Nuevo recurso
+      </button>
+    {% endif %}
+  </div>
+</section>
+
+<section class="card lift-in">
+  <div class="card__header">
+    <div class="card__title">Listado</div>
+    <div class="pill" id="countPill">—</div>
+  </div>
+
+  <div class="table-wrap">
+    <table class="table" id="resourcesTable">
+      <thead>
+        <tr>
+          <th>Nombre</th>
+          <th>Tipo</th>
+          <th>Entorno</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in resources %}
+          <tr class="row row--link" onclick="location.href='{% url 'resource_detail' r.pk %}'">
+            <td class="mono">{{ r.name }}</td>
+            <td><span class="badge">{{ r.get_resource_type_display }}</span></td>
+            <td><span class="badge badge--soft">{{ r.get_environment_display }}</span></td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="3" class="empty">
+              No hay recursos todavía.
+              <span class="empty__hint">Crea el primero con el botón de arriba.</span>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+
+{# ── Modal: Nuevo recurso ── #}
+{% if perms.core.add_resource %}
+<dialog id="modalNewResource">
+  <div class="modal__header">
+    <span class="modal__title">Nuevo recurso</span>
+    <button id="btnCloseModal" class="modal__close" aria-label="Cerrar">×</button>
+  </div>
+
+  <form id="formNewResource" method="post" action="{% url 'resource_create' %}" novalidate class="modal__body">
+    {% csrf_token %}
+
+    <div id="modalErrors" class="modal__errors" style="display:none;"></div>
+
+    {% for field in form %}
+      <div class="modal__field">
+        <label for="{{ field.id_for_label }}" class="modal__label">
+          {{ field.label }}{% if field.field.required %} <span class="modal__required">*</span>{% endif %}
+        </label>
+        {% if field.field.widget.input_type == 'checkbox' %}
+          <label class="toggle">
+            {{ field }}
+            <span class="toggle__track">
+              <span class="toggle__thumb"></span>
+            </span>
+            <span class="toggle__label">Activo</span>
+          </label>
+        {% else %}
+          {{ field }}
+        {% endif %}
+        <div class="field-error" data-field="{{ field.html_name }}"></div>
+      </div>
+    {% endfor %}
+
+    <div class="modal__actions">
+      <button type="submit" class="modal__btn-submit">Crear recurso</button>
+      <button type="button" id="btnCancelModal" class="modal__btn-cancel">Cancelar</button>
+    </div>
+  </form>
+</dialog>
+{% endif %}
+
+<script>
+document.body.addEventListener("htmx:afterSettle", () => {
+  // Guard: only run when resources table is present
+  if (!document.getElementById("resourcesTable")) return;
+
+  // ── Search/filter ──────────────────────────────────────────────────────
+  (() => {
+    const q = document.getElementById("q");
+    const table = document.getElementById("resourcesTable");
+    const pill = document.getElementById("countPill");
+
+    if (!table || !pill) return;
+
+    const rows = Array.from(table.querySelectorAll("tbody tr.row"));
+
+    const setCount = (n) => {
+      pill.textContent = `${n} recurso${n === 1 ? "" : "s"}`;
+    };
+
+    const filter = (value) => {
+      const term = value.trim().toLowerCase();
+      let visible = 0;
+
+      rows.forEach((tr) => {
+        const text = tr.innerText.toLowerCase();
+        const show = term === "" || text.includes(term);
+        tr.style.display = show ? "" : "none";
+        if (show) visible += 1;
+      });
+
+      setCount(visible);
+    };
+
+    if (rows.length > 0) setCount(rows.length);
+
+    if (q) {
+      q.addEventListener("input", (e) => filter(e.target.value));
+    }
+  })();
+
+  // ── Modal: Nuevo recurso ──────────────────────────────────────────────
+  const modal = document.getElementById("modalNewResource");
+  const btnOpen = document.getElementById("btnNewResource");
+  const btnClose = document.getElementById("btnCloseModal");
+  const btnCancel = document.getElementById("btnCancelModal");
+  const form = document.getElementById("formNewResource");
+  const errBox = document.getElementById("modalErrors");
+
+  if (!modal || !btnOpen) return;
+
+  function getCsrfToken() {
+    const value = `; ${document.cookie}`;
+    const parts = value.split("; csrftoken=");
+    if (parts.length === 2) return parts.pop().split(";").shift();
+    return "";
+  }
+
+  function openModal() {
+    errBox.style.display = "none";
+    errBox.textContent = "";
+    document.querySelectorAll(".field-error").forEach((el) => (el.textContent = ""));
+    form.reset();
+    modal.showModal();
+  }
+
+  function closeModal() {
+    modal.close();
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement("div");
+    div.appendChild(document.createTextNode(String(str)));
+    return div.innerHTML;
+  }
+
+  function showErrors(errors) {
+    let hasGeneral = false;
+    for (const [field, messages] of Object.entries(errors)) {
+      const safeMsg = messages.map((m) => escapeHtml(m)).join(", ");
+      const fieldEl = document.querySelector(`.field-error[data-field="${field}"]`);
+      if (fieldEl) {
+        fieldEl.textContent = safeMsg;
+      } else {
+        errBox.textContent += safeMsg + " ";
+        hasGeneral = true;
+      }
+    }
+    if (hasGeneral) errBox.style.display = "block";
+  }
+
+  btnOpen.addEventListener("click", openModal);
+  btnClose.addEventListener("click", closeModal);
+  btnCancel.addEventListener("click", closeModal);
+
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) closeModal();
+  });
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    errBox.style.display = "none";
+    errBox.textContent = "";
+    document.querySelectorAll(".field-error").forEach((el) => (el.textContent = ""));
+
+    try {
+      const response = await fetch(form.action, {
+        method: "POST",
+        headers: {
+          "X-CSRFToken": getCsrfToken(),
+          "X-Requested-With": "XMLHttpRequest",
+        },
+        body: new FormData(form),
+      });
+
+      if (!response.ok && response.status !== 400) {
+        errBox.textContent = `Error del servidor (${response.status}). Inténtalo de nuevo.`;
+        errBox.style.display = "block";
+        return;
+      }
+
+      const data = await response.json();
+
+      if (data.success) {
+        closeModal();
+        window.location.reload();
+      } else {
+        showErrors(data.errors || {});
+      }
+    } catch (err) {
+      errBox.textContent = "Error de red. Comprueba tu conexión e inténtalo de nuevo.";
+      errBox.style.display = "block";
+    }
+  });
+});
+</script>

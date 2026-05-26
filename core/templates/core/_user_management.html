@@ -1,0 +1,613 @@
+<style>
+  .status-dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+
+  .status-dot--active {
+    background: var(--accent);
+    box-shadow: 0 0 6px rgba(110, 231, 255, 0.5);
+  }
+
+  .status-dot--inactive {
+    background: rgba(154, 167, 182, 0.4);
+  }
+
+  .actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .btn-action {
+    padding: 5px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--muted);
+    transition:
+      color 0.15s ease,
+      border-color 0.15s ease,
+      background 0.15s ease;
+    text-decoration: none;
+  }
+
+  .btn-action:hover {
+    color: var(--text);
+    border-color: var(--line2);
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  .btn-action--danger {
+    border-color: rgba(255, 80, 90, 0.2);
+    color: rgba(255, 80, 90, 0.7);
+    background: rgba(255, 80, 90, 0.04);
+  }
+
+  .btn-action--danger:hover {
+    border-color: rgba(255, 80, 90, 0.4);
+    color: rgba(255, 80, 90, 0.95);
+    background: rgba(255, 80, 90, 0.08);
+  }
+
+  .btn-action--success {
+    border-color: rgba(110, 231, 255, 0.2);
+    color: rgba(110, 231, 255, 0.7);
+    background: rgba(110, 231, 255, 0.04);
+  }
+
+  .btn-action--success:hover {
+    border-color: rgba(110, 231, 255, 0.4);
+    color: rgba(110, 231, 255, 0.95);
+    background: rgba(110, 231, 255, 0.08);
+  }
+
+  /* Ajustes modal crear usuario */
+  #modalCreateUser .modal__body {
+    padding-bottom: 8px;
+  }
+
+  #modalCreateUser .modal__field {
+    margin-bottom: 12px;
+  }
+
+  #modalCreateUser .modal__actions {
+    padding: 14px 26px 20px;
+    margin-top: 0;
+  }
+
+  /* Ajustes modal editar usuario */
+  #modalEditUser .modal__body {
+    padding-bottom: 8px;
+  }
+
+  #modalEditUser .modal__field {
+    margin-bottom: 12px;
+  }
+
+  #modalEditUser .modal__actions {
+    padding: 14px 26px 20px;
+    margin-top: 0;
+  }
+
+  /* Label opcional */
+  .modal__optional {
+    color: rgba(154, 167, 182, 0.45);
+    font-size: 10px;
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
+    margin-left: 4px;
+  }
+
+  /* ===================================================================
+     RESPONSIVE — Mobile (max-width: 480px)
+     =================================================================== */
+  @media (max-width: 480px) {
+    .actions {
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .btn-action {
+      flex: 1 1 100%;
+      text-align: center;
+      padding: 8px 12px;
+    }
+
+    #modalCreateUser .modal__actions,
+    #modalEditUser .modal__actions {
+      padding: 12px 16px 16px;
+    }
+  }
+</style>
+
+<section class="hero">
+  <div class="hero__left">
+    <h1 class="h1">Gestión de usuarios</h1>
+    <p class="muted">Administra cuentas, roles y accesos del sistema.</p>
+  </div>
+  <div
+    class="hero__right"
+    style="display: flex; align-items: center; gap: 12px"
+  >
+    <div class="search" role="search">
+      <label class="sr-only" for="q">Buscar</label>
+      <input
+        id="q"
+        class="search__input"
+        type="search"
+        placeholder="Buscar por usuario…"
+        autocomplete="off"
+      />
+      <span class="search__kbd" aria-hidden="true">⌘K</span>
+    </div>
+    <button
+      id="btnNewUser"
+      style="
+        padding: 6px 14px;
+        border-radius: 6px;
+        background: var(--accent);
+        color: #0b0f14;
+        font-size: 13px;
+        font-weight: 600;
+        border: none;
+        cursor: pointer;
+        white-space: nowrap;
+      "
+    >
+      + Nuevo usuario
+    </button>
+  </div>
+</section>
+
+<section class="card lift-in">
+  <div class="card__header">
+    <div class="card__title">Usuarios</div>
+    <div class="pill" id="countPill">
+      {{ users|length }} usuario{{ users|length|pluralize:"s" }}
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table class="table" id="usersTable">
+      <thead>
+        <tr>
+          <th>Usuario</th>
+          <th>Email</th>
+          <th>Rol</th>
+          <th>Último acceso</th>
+          <th>Estado</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in users %}
+        <tr class="row">
+          <td class="mono">@{{ u.username }}</td>
+          <td>{{ u.email|default:"—" }}</td>
+          <td>
+            {% for group in u.groups.all %}
+            <span
+              class="badge badge--role"
+              style="
+                border-color: rgba(167, 139, 250, 0.25);
+                color: rgba(167, 139, 250, 0.9);
+                background: rgba(167, 139, 250, 0.06);
+                text-transform: capitalize;
+              "
+              >{{ group.name }}</span
+            >
+            {% empty %}
+            <span class="badge" style="color: var(--muted)">Sin rol</span>
+            {% endfor %}
+          </td>
+          <td style="color: var(--muted); font-size: 13px">
+            {% if u.last_login %}{{ u.last_login|date:"d M Y, H:i" }}{% else
+            %}—{% endif %}
+          </td>
+          <td>
+            {% if u.is_active %}
+            <span class="badge badge--active">
+              <span class="status-dot status-dot--active"></span>Activo
+            </span>
+            {% else %}
+            <span class="badge" style="color: var(--muted)">
+              <span class="status-dot status-dot--inactive"></span>Inactivo
+            </span>
+            {% endif %}
+          </td>
+          <td>
+            <div class="actions">
+              <button
+                class="btn-action"
+                data-action="edit"
+                data-pk="{{ u.pk }}"
+              >
+                Editar
+              </button>
+              {% if u.is_active %}
+              <button
+                class="btn-action btn-action--danger"
+                data-action="toggle"
+                data-pk="{{ u.pk }}"
+              >
+                Desactivar
+              </button>
+              {% else %}
+              <button
+                class="btn-action btn-action--success"
+                data-action="toggle"
+                data-pk="{{ u.pk }}"
+              >
+                Activar
+              </button>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="6" class="empty">No hay usuarios todavía.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+<!-- Modal crear usuario -->
+<dialog id="modalCreateUser">
+  <div class="modal__header">
+    <h2 class="modal__title">Nuevo usuario</h2>
+    <button class="modal__close" id="btnCloseCreateUser" aria-label="Cerrar">
+      &times;
+    </button>
+  </div>
+  <form id="formCreateUser" novalidate>
+    {% csrf_token %}
+    <div class="modal__body">
+      <div
+        id="createUserErrors"
+        class="modal__errors"
+        style="display: none"
+      ></div>
+
+      <div class="modal__field">
+        <label class="modal__label" for="id_username"
+          >Usuario <span class="modal__required">*</span></label
+        >
+        <input
+          type="text"
+          id="id_username"
+          name="username"
+          autocomplete="off"
+        />
+      </div>
+      <div class="modal__field">
+        <label class="modal__label" for="id_email">Email</label>
+        <input type="email" id="id_email" name="email" autocomplete="off" />
+      </div>
+      <div class="modal__field">
+        <label class="modal__label" for="id_first_name">Nombre</label>
+        <input type="text" id="id_first_name" name="first_name" />
+      </div>
+      <div class="modal__field">
+        <label class="modal__label" for="id_last_name">Apellido</label>
+        <input type="text" id="id_last_name" name="last_name" />
+      </div>
+      <div class="modal__field">
+        <label class="modal__label" for="id_password"
+          >Contraseña temporal <span class="modal__required">*</span></label
+        >
+        <input
+          type="password"
+          id="id_password"
+          name="password"
+          autocomplete="new-password"
+        />
+      </div>
+      <div class="modal__field">
+        <label class="modal__label" for="id_role"
+          >Rol <span class="modal__required">*</span></label
+        >
+        <select id="id_role" name="role">
+          {% for group in groups %}
+          <option value="{{ group.pk }}">{{ group.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="modal__actions">
+      <button type="submit" class="modal__btn-submit">Crear usuario</button>
+      <button type="button" class="modal__btn-cancel" id="btnCancelCreateUser">
+        Cancelar
+      </button>
+    </div>
+  </form>
+</dialog>
+<!-- Modal editar usuario -->
+<dialog id="modalEditUser">
+  <div class="modal__header">
+    <h2 class="modal__title">Editar usuario</h2>
+    <button class="modal__close" id="btnCloseEditUser" aria-label="Cerrar">
+      &times;
+    </button>
+  </div>
+  <form id="formEditUser" novalidate>
+    {% csrf_token %}
+    <div class="modal__body">
+      <div
+        id="editUserErrors"
+        class="modal__errors"
+        style="display: none"
+      ></div>
+      <div class="modal__field">
+        <label class="modal__label" for="edit_username"
+          >Usuario <span class="modal__required">*</span></label
+        >
+        <input
+          type="text"
+          id="edit_username"
+          name="username"
+          autocomplete="off"
+        />
+      </div>
+      <div class="modal__field">
+        <label class="modal__label" for="edit_email">Email</label>
+        <input type="email" id="edit_email" name="email" autocomplete="off" />
+      </div>
+      <div class="modal__field">
+        <label class="modal__label" for="edit_first_name">Nombre</label>
+        <input type="text" id="edit_first_name" name="first_name" />
+      </div>
+      <div class="modal__field">
+        <label class="modal__label" for="edit_last_name">Apellido</label>
+        <input type="text" id="edit_last_name" name="last_name" />
+      </div>
+      <div class="modal__field">
+        <label class="modal__label" for="edit_role"
+          >Rol <span class="modal__required">*</span></label
+        >
+        <select id="edit_role" name="role">
+          {% for group in groups %}
+          <option value="{{ group.pk }}">{{ group.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="modal__field">
+        <label class="modal__label" for="edit_password"
+          >Nueva contraseña
+          <span class="modal__optional">(opcional)</span></label
+        >
+        <input
+          type="password"
+          id="edit_password"
+          name="password"
+          autocomplete="new-password"
+          placeholder="Dejar vacío para no cambiar"
+        />
+      </div>
+    </div>
+    <div class="modal__actions">
+      <button type="submit" class="modal__btn-submit">Guardar cambios</button>
+      <button type="button" class="modal__btn-cancel" id="btnCancelEditUser">
+        Cancelar
+      </button>
+    </div>
+  </form>
+</dialog>
+<script>
+  document.body.addEventListener("htmx:afterSettle", () => {
+  // User search/filter (from user_management.js top)
+  (() => {
+    const q = document.getElementById("q");
+    const table = document.getElementById("usersTable");
+    const pill = document.getElementById("countPill");
+
+    if (!table || !pill) return;
+    if (!q) return;
+
+    const rows = Array.from(table.querySelectorAll("tbody tr.row"));
+
+    const setCount = (n) => {
+      pill.textContent = `${n} usuario${n === 1 ? "" : "s"}`;
+    };
+
+    const filter = (value) => {
+      const term = value.trim().toLowerCase();
+      let visible = 0;
+
+      rows.forEach((tr) => {
+        const text = tr.innerText.toLowerCase();
+        const show = term === "" || text.includes(term);
+        tr.style.display = show ? "" : "none";
+        if (show) visible += 1;
+      });
+
+      setCount(visible);
+    };
+
+    // Initial count
+    if (rows.length > 0) setCount(rows.length);
+
+    q.addEventListener("input", (e) => filter(e.target.value));
+  })();
+
+  // Helper: get CSRF token
+  function getCsrfToken() {
+    const match = document.cookie.match(/csrftoken=([^;]+)/);
+    return match ? match[1] : "";
+  }
+
+  // Toggle user active/inactive
+  document.querySelectorAll("[data-action='toggle']").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const pk = btn.dataset.pk;
+
+      const response = await fetch(`/users/${pk}/toggle/`, {
+        method: "POST",
+        headers: {
+          "X-CSRFToken": getCsrfToken(),
+          "X-Requested-With": "XMLHttpRequest",
+        },
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        location.reload();
+      }
+    });
+  });
+
+  // Modal: Create user
+  const modalCreateUser = document.getElementById("modalCreateUser");
+  const btnNewUser = document.getElementById("btnNewUser");
+  const btnCloseCreateUser = document.getElementById("btnCloseCreateUser");
+  const btnCancelCreateUser = document.getElementById("btnCancelCreateUser");
+  const formCreateUser = document.getElementById("formCreateUser");
+  const createUserErrors = document.getElementById("createUserErrors");
+
+  btnNewUser.addEventListener("click", () => {
+    formCreateUser.reset();
+    createUserErrors.style.display = "none";
+    modalCreateUser.showModal();
+  });
+
+  [btnCloseCreateUser, btnCancelCreateUser].forEach((btn) => {
+    btn.addEventListener("click", () => modalCreateUser.close());
+  });
+
+  modalCreateUser.addEventListener("click", (e) => {
+    if (e.target === modalCreateUser) modalCreateUser.close();
+  });
+
+  formCreateUser.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    createUserErrors.style.display = "none";
+
+    const response = await fetch("/users/create/", {
+      method: "POST",
+      headers: {
+        "X-CSRFToken": getCsrfToken(),
+        "X-Requested-With": "XMLHttpRequest",
+      },
+      body: new FormData(formCreateUser),
+    });
+
+    const data = await response.json();
+
+    if (data.success) {
+      modalCreateUser.close();
+      location.reload();
+    } else {
+      const messages = Object.entries(data.errors)
+        .map(([field, errs]) => `<strong>${field}:</strong> ${errs.join(", ")}`)
+        .join("<br>");
+      createUserErrors.innerHTML = messages;
+      createUserErrors.style.display = "block";
+    }
+  });
+
+  // Modal: Edit user
+  const modalEditUser = document.getElementById("modalEditUser");
+  const btnCloseEditUser = document.getElementById("btnCloseEditUser");
+  const btnCancelEditUser = document.getElementById("btnCancelEditUser");
+  const formEditUser = document.getElementById("formEditUser");
+  const editUserErrors = document.getElementById("editUserErrors");
+
+  function closeEditModal() {
+    modalEditUser.close();
+  }
+
+  function fillEditForm(data) {
+    formEditUser.querySelector("#edit_username").value = data.username || "";
+    formEditUser.querySelector("#edit_email").value = data.email || "";
+    formEditUser.querySelector("#edit_first_name").value =
+      data.first_name || "";
+    formEditUser.querySelector("#edit_last_name").value = data.last_name || "";
+    formEditUser.querySelector("#edit_password").value = "";
+
+    const selectRole = formEditUser.querySelector("#edit_role");
+    if (data.group) {
+      selectRole.value = data.group;
+    }
+  }
+
+  document.querySelectorAll("[data-action='edit']").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const pk = btn.dataset.pk;
+      editUserErrors.style.display = "none";
+
+      try {
+        const response = await fetch(`/users/${pk}/data/`, {
+          headers: { "X-Requested-With": "XMLHttpRequest" },
+        });
+
+        if (!response.ok) {
+          alert(`Error al cargar los datos (${response.status})`);
+          return;
+        }
+
+        const data = await response.json();
+        fillEditForm(data);
+        formEditUser.dataset.pk = pk;
+        modalEditUser.showModal();
+      } catch (err) {
+        alert("Error de red al cargar los datos del usuario.");
+      }
+    });
+  });
+
+  [btnCloseEditUser, btnCancelEditUser].forEach((btn) => {
+    btn.addEventListener("click", closeEditModal);
+  });
+
+  modalEditUser.addEventListener("click", (e) => {
+    if (e.target === modalEditUser) closeEditModal();
+  });
+
+  formEditUser.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    editUserErrors.style.display = "none";
+
+    const pk = formEditUser.dataset.pk;
+
+    try {
+      const response = await fetch(`/users/${pk}/edit/`, {
+        method: "POST",
+        headers: {
+          "X-CSRFToken": getCsrfToken(),
+          "X-Requested-With": "XMLHttpRequest",
+        },
+        body: new FormData(formEditUser),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        closeEditModal();
+        location.reload();
+      } else {
+        const messages = Object.entries(data.errors)
+          .map(
+            ([field, errs]) => `<strong>${field}:</strong> ${errs.join(", ")}`,
+          )
+          .join("<br>");
+        editUserErrors.innerHTML = messages;
+        editUserErrors.style.display = "block";
+      }
+    } catch (err) {
+      editUserErrors.textContent =
+        "Error de red. Comprueba tu conexión e inténtalo de nuevo.";
+      editUserErrors.style.display = "block";
+    }
+  });
+  });
+</script>

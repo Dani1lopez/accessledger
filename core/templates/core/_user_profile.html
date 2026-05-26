@@ -1,8 +1,3 @@
-{% extends "core/base.html" %}
-
-{% block title %}Perfil — AccessLedger{% endblock %}
-
-{% block extra_css %}
 <style>
   .profile-page {
     max-width: 720px;
@@ -177,8 +172,70 @@
 
   .btn--full { width: 100%; }
 </style>
-{% endblock %}
 
-{% block content %}
-{% include "core/_user_profile.html" %}
-{% endblock %}
+<div class="profile-page">
+
+  <div class="page-header">
+    <h1 class="page-title">Perfil</h1>
+    <p class="page-subtitle">Información de tu cuenta y configuración de seguridad.</p>
+  </div>
+
+  <div class="profile-grid">
+
+    <section class="profile-card">
+      <div class="profile-card__header">
+        <div class="profile-avatar" aria-hidden="true">{{ user.username|first|upper }}</div>
+        <div>
+          <h2 class="profile-card__title">@{{ user.username }}</h2>
+          <p class="profile-card__subtitle">
+            {% for group in user.groups.all %}
+              <span class="badge badge--role">{{ group.name }}</span>
+            {% empty %}
+              <span class="badge badge--muted">Sin rol asignado</span>
+            {% endfor %}
+          </p>
+        </div>
+      </div>
+
+      <dl class="profile-details">
+        <div class="profile-details__row">
+          <dt class="profile-details__label">Usuario</dt>
+          <dd class="profile-details__value mono">{{ user.username }}</dd>
+        </div>
+        <div class="profile-details__row">
+          <dt class="profile-details__label">Email</dt>
+          <dd class="profile-details__value">
+            {% if user.email %}{{ user.email }}{% else %}<span class="text-muted">—</span>{% endif %}
+          </dd>
+        </div>
+        <div class="profile-details__row">
+          <dt class="profile-details__label">Miembro desde</dt>
+          <dd class="profile-details__value">{{ user.date_joined|date:"d M Y" }}</dd>
+        </div>
+        <div class="profile-details__row">
+          <dt class="profile-details__label">Último acceso</dt>
+          <dd class="profile-details__value">
+            {% if user.last_login %}{{ user.last_login|date:"d M Y, H:i" }}{% else %}<span class="text-muted">—</span>{% endif %}
+          </dd>
+        </div>
+        <div class="profile-details__row">
+          <dt class="profile-details__label">Estado</dt>
+          <dd class="profile-details__value">
+            {% if user.is_active %}
+              <span class="badge badge--active-status">Activo</span>
+            {% else %}
+              <span class="badge badge--inactive-status">Inactivo</span>
+            {% endif %}
+          </dd>
+        </div>
+      </dl>
+    </section>
+
+    <section class="profile-card">
+      <h2 class="profile-card__title profile-card__title--standalone">Seguridad</h2>
+      <p class="profile-card__desc">Actualiza tu contraseña regularmente para mantener tu cuenta segura.</p>
+      <a href="{% url 'password_change' %}" class="btn btn--primary btn--full">Cambiar contraseña</a>
+    </section>
+
+  </div>
+</div>

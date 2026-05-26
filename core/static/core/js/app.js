@@ -529,3 +529,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 });
+
+document.addEventListener('htmx:afterSettle', () => {
+  const path = window.location.pathname;
+  document.querySelectorAll('.nav__link').forEach(link => {
+    const href = link.getAttribute('href');
+    if (href) {
+      link.classList.toggle('nav__link--active', path === href || path.startsWith(href + '/'));
+    }
+  });
+});

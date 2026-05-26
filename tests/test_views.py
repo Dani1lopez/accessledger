@@ -290,6 +290,56 @@ class TestAuditLogView:
         # Diff table structure present
         assert '<table class="diff-table"' in content
 
+    # ── HTMX navigation tests ──
+
+    def test_htmx_request_returns_partial(self, admin_client):
+        """HTMX request returns partial template without base layout."""
+        AuditLog.objects.create(
+            user=None,
+            action="resource_created",
+            object_type="Resource",
+            object_id=10,
+            object_repr="htmx-test",
+            before=None,
+            after={"name": "htmx-test"},
+        )
+        response = admin_client.get("/audit_log/", HTTP_HX_REQUEST="true")
+        assert response.status_code == 200
+        content = response.content.decode()
+        assert "<html" not in content
+
+    def test_htmx_partial_includes_modal_js(self, admin_client):
+        """HTMX partial includes inline modal JS for re-initialization."""
+        response = admin_client.get("/audit_log/", HTTP_HX_REQUEST="true")
+        assert response.status_code == 200
+        content = response.content.decode()
+        assert "parseSnapshot" in content
+        assert "computeDiff" in content
+
+    def test_normal_request_returns_full_page(self, admin_client):
+        """Non-HTMX request returns full page with base template."""
+        AuditLog.objects.create(
+            user=None,
+            action="resource_created",
+            object_type="Resource",
+            object_id=11,
+            object_repr="full-page-test",
+            before=None,
+            after={"name": "full-page-test"},
+        )
+        response = admin_client.get("/audit_log/")
+        assert response.status_code == 200
+        content = response.content.decode()
+        assert "<html" in content
+
+    def test_htmx_partial_excludes_block_wrappers(self, admin_client):
+        """HTMX partial does not include Django template block syntax."""
+        response = admin_client.get("/audit_log/", HTTP_HX_REQUEST="true")
+        assert response.status_code == 200
+        content = response.content.decode()
+        assert "{% extends" not in content
+        assert "{% block" not in content
+
 
 @pytest.mark.django_db
 class TestUserCreateView:
@@ -366,3 +416,45 @@ class TestUserUpdateView:
             f"/users/{user.pk}/edit/", HTTP_X_REQUESTED_WITH="XMLHttpRequest"
         )
         assert response.status_code == 405
+
+
+@pytest.mark.django_db
+class TestUserProfileView:
+    def test_redirects_if_not_logged_in(self, client):
+        response = client.get("/users/profile/")
+        assert response.status_code == 302
+
+    def test_authenticated_user_can_access(self, viewer_client):
+        response = viewer_client.get("/users/profile/")
+        assert response.status_code == 200
+
+    def test_htmx_request_returns_partial(self, viewer_client):
+        """HTMX request returns partial without base layout."""
+        response = viewer_client.get("/users/profile/", HTTP_HX_REQUEST="true")
+        assert response.status_code == 200
+        content = response.content.decode()
+        assert "<html" not in content
+
+    def test_htmx_partial_has_profile_content(self, viewer_client):
+        """HTMX partial includes profile info but no block wrappers."""
+        response = viewer_client.get("/users/profile/", HTTP_HX_REQUEST="true")
+        assert response.status_code == 200
+        content = response.content.decode()
+        assert "Perfil" in content
+        assert "{% extends" not in content
+        assert "{% block" not in content
+
+    def test_normal_request_returns_full_page(self, viewer_client):
+        """Non-HTMX request returns full page with base template."""
+        response = viewer_client.get("/users/profile/")
+        assert response.status_code == 200
+        content = response.content.decode()
+        assert "<html" in content
+
+    def test_htmx_partial_excludes_extra_css_block(self, viewer_client):
+        """HTMX partial should not include the extra_css block (styles live in <head>)."""
+        response = viewer_client.get("/users/profile/", HTTP_HX_REQUEST="true")
+        assert response.status_code == 200
+        content = response.content.decode()
+        assert "{% block extra_css %}" not in content
+        assert "profile-page" in content

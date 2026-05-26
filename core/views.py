@@ -14,9 +14,13 @@ from .utils import log_action
 @permission_required("core.view_resource", raise_exception=True)
 def resource_list(request):
     resources = Resource.objects.all().order_by("name")
+    if request.htmx:
+        template = "core/_resource_table.html"
+    else:
+        template = "core/resource_list.html"
     return render(
         request,
-        "core/resource_list.html",
+        template,
         {"resources": resources, "form": ResourceForm()},
     )
 
@@ -264,9 +268,13 @@ class CustomPasswordChangeView(PasswordChangeView):
 @login_required
 def user_profile(request):
     user = request.user
+    if request.htmx:
+        template = "core/_user_profile.html"
+    else:
+        template = "core/user_profile.html"
     return render(
         request,
-        "core/user_profile.html",
+        template,
         {
             "user": user,
         },
@@ -278,9 +286,13 @@ def user_profile(request):
 def user_management(request):
     users = User.objects.all().prefetch_related("groups")
     groups = Group.objects.all()
+    if request.htmx:
+        template = "core/_user_management.html"
+    else:
+        template = "core/user_management.html"
     return render(
         request,
-        "core/user_management.html",
+        template,
         {
             "users": users,
             "groups": groups,
@@ -414,9 +426,13 @@ def user_update(request, pk):
 @admin_required
 def audit_log(request):
     audit = AuditLog.objects.all().order_by("-timestamp").select_related("user")
+    if request.htmx:
+        template = "core/_audit_log.html"
+    else:
+        template = "core/audit_log.html"
     return render(
         request,
-        "core/audit_log.html",
+        template,
         {
             "audit": audit,
         },
