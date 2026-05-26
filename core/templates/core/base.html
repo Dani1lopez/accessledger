@@ -9,6 +9,7 @@
 
     <link rel="stylesheet" href="{% static 'core/css/app.css' %}" />
     {% if perms.core.delete_resource %}
+    <link rel="stylesheet" href="{% static 'core/css/user_management.css' %}">
     <link rel="stylesheet" href="{% static 'core/css/audit_log.css' %}">
     {% endif %}
     {% block extra_css %}{% endblock %}
