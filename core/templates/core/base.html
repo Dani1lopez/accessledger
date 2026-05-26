@@ -12,6 +12,9 @@
     <link rel="stylesheet" href="{% static 'core/css/user_management.css' %}">
     <link rel="stylesheet" href="{% static 'core/css/audit_log.css' %}">
     {% endif %}
+    {% if request.user.is_authenticated %}
+    <link rel="stylesheet" href="{% static 'core/css/user_profile.css' %}">
+    {% endif %}
     {% block extra_css %}{% endblock %}
     <script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js" defer></script>
   </head>
