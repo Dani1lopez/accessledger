@@ -1,0 +1,101 @@
+.btn-detail {
+  padding: 4px 12px;
+  border-radius: 7px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,.02);
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+  transition: color .15s ease, border-color .15s ease, background .15s ease;
+}
+.btn-detail:hover {
+  color: var(--text);
+  border-color: var(--line2);
+  background: rgba(255,255,255,.05);
+}
+
+/* ── Diff Table ── */
+.diff-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.diff-table thead th {
+  text-align: left;
+  padding: 8px 12px;
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  font-weight: 600;
+  border-bottom: 1px solid var(--line);
+}
+.diff-table tbody td {
+  padding: 10px 12px;
+  vertical-align: top;
+  border-bottom: 1px solid var(--line);
+}
+.diff-table .diff-field {
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+}
+.diff-table .diff-old {
+  color: rgba(255, 80, 90, .85);
+  background: rgba(255, 80, 90, .06);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: var(--mono);
+  font-size: 12px;
+  word-break: break-all;
+}
+.diff-table .diff-new {
+  color: rgba(110, 231, 255, .9);
+  background: rgba(110, 231, 255, .06);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: var(--mono);
+  font-size: 12px;
+  word-break: break-all;
+}
+
+/* ── Audit log table cell helpers ── */
+.audit-timestamp {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.audit-object-type {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+.audit-object-repr {
+  font-size: 13px;
+  display: block;
+}
+
+/* ── Modal helpers ── */
+.modal__detail-object {
+  font-size: 12px;
+  color: var(--muted);
+  display: block;
+  margin-top: 2px;
+}
+
+.modal__body--diff {
+  display: grid;
+  gap: 16px;
+}
+
+/* ── Diff empty state ── */
+.diff-empty {
+  display: none;
+  text-align: center;
+  padding: 24px;
+  color: var(--muted);
+  font-size: 14px;
+}

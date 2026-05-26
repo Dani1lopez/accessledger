@@ -25,7 +25,7 @@
       <tbody>
         {% for entry in audit %}
           <tr class="row">
-            <td class="mono" style="font-size:12px; color:var(--muted); white-space:nowrap;">
+            <td class="mono audit-timestamp">
               {{ entry.timestamp|date:"d/m/Y H:i" }}
             </td>
             <td class="mono">
@@ -41,8 +41,8 @@
               </span>
             </td>
             <td>
-              <span style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;">{{ entry.object_type }}</span>
-              <span class="mono" style="font-size:13px; display:block;">{{ entry.object_repr }}</span>
+              <span class="audit-object-type">{{ entry.object_type }}</span>
+              <span class="mono audit-object-repr">{{ entry.object_repr }}</span>
             </td>
             <td>
               <button class="btn-detail"
@@ -72,12 +72,12 @@
   <div class="modal__header">
     <div>
       <span class="modal__title" id="detailAction"></span>
-      <span class="mono" style="font-size:12px; color:var(--muted); display:block; margin-top:2px;" id="detailObject"></span>
+      <span class="mono modal__detail-object" id="detailObject"></span>
     </div>
     <button id="btnCloseDetail" class="modal__close" aria-label="Cerrar">×</button>
   </div>
 
-  <div class="modal__body" style="display:grid; gap:16px;">
+  <div class="modal__body modal__body--diff">
     <table class="diff-table" id="diffTable">
       <thead>
         <tr>
@@ -88,72 +88,10 @@
       </thead>
       <tbody id="diffTableBody"></tbody>
     </table>
-    <div id="diffEmpty" style="display:none; text-align:center; padding:24px; color:var(--muted); font-size:14px;">
+    <div id="diffEmpty" class="diff-empty">
       No hay cambios para mostrar
     </div>
   </div>
 </dialog>
 
-<style>
-.btn-detail {
-  padding: 4px 12px;
-  border-radius: 7px;
-  border: 1px solid var(--line);
-  background: rgba(255,255,255,.02);
-  color: var(--muted);
-  font-size: 12px;
-  cursor: pointer;
-  transition: color .15s ease, border-color .15s ease, background .15s ease;
-}
-.btn-detail:hover {
-  color: var(--text);
-  border-color: var(--line2);
-  background: rgba(255,255,255,.05);
-}
-
-/* ── Diff Table ── */
-.diff-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-.diff-table thead th {
-  text-align: left;
-  padding: 8px 12px;
-  font-size: 11px;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: .07em;
-  font-weight: 600;
-  border-bottom: 1px solid var(--line);
-}
-.diff-table tbody td {
-  padding: 10px 12px;
-  vertical-align: top;
-  border-bottom: 1px solid var(--line);
-}
-.diff-table .diff-field {
-  font-weight: 600;
-  color: var(--text);
-  white-space: nowrap;
-}
-.diff-table .diff-old {
-  color: rgba(255, 80, 90, .85);
-  background: rgba(255, 80, 90, .06);
-  border-radius: 4px;
-  padding: 2px 6px;
-  font-family: var(--mono);
-  font-size: 12px;
-  word-break: break-all;
-}
-.diff-table .diff-new {
-  color: rgba(110, 231, 255, .9);
-  background: rgba(110, 231, 255, .06);
-  border-radius: 4px;
-  padding: 2px 6px;
-  font-family: var(--mono);
-  font-size: 12px;
-  word-break: break-all;
-}
-</style>
 
