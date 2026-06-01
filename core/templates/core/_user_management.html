@@ -58,8 +58,8 @@
             {% endfor %}
           </td>
           <td class="muted last-login-cell">
-            {% if u.last_login %}{{ u.last_login|date:"d M Y, H:i" }}{% else
-            %}—{% endif %}
+            {% if u.last_login %}{{ u.last_login|date:"d M Y, H:i" }}{% else %}—
+            {% endif %}
           </td>
           <td>
             {% if u.is_active %}
