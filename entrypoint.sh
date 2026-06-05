@@ -16,6 +16,21 @@ if [ -n "$DJANGO_SUPERUSER_USERNAME" ] && [ -n "$DJANGO_SUPERUSER_PASSWORD" ] &&
     --noinput \
     --username "$DJANGO_SUPERUSER_USERNAME" \
     --email "$DJANGO_SUPERUSER_EMAIL" 2>&1 || echo "WARNING: superuser creation skipped or failed"
+
+  echo "Asignando grupo admin al superusuario..."
+  python manage.py shell -c "
+from django.contrib.auth.models import User, Group
+try:
+    u = User.objects.get(username='$DJANGO_SUPERUSER_USERNAME')
+    g = Group.objects.get(name='admin')
+    u.groups.add(g)
+    u.save()
+    print('Admin group assigned to $DJANGO_SUPERUSER_USERNAME')
+except User.DoesNotExist:
+    print('WARNING: user $DJANGO_SUPERUSER_USERNAME does not exist yet')
+except Group.DoesNotExist:
+    print('WARNING: admin group does not exist yet (run bootstrap_roles first)')
+" 2>&1 || echo "WARNING: group assignment failed"
 fi
 echo "Arrancando servidor..."
 if [ "$DEBUG" = "True" ]; then
