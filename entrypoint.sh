@@ -10,6 +10,13 @@ echo "Demo roles/data se crean en background (no bloquea el arranque)..."
     python manage.py bootstrap_roles && python manage.py seed_data || echo "WARNING: demo seeding falló — ignorando"
   fi
 ) &
+echo "Creando superusuario si no existe..."
+if [ -n "$DJANGO_SUPERUSER_USERNAME" ] && [ -n "$DJANGO_SUPERUSER_PASSWORD" ] && [ -n "$DJANGO_SUPERUSER_EMAIL" ]; then
+  DJANGO_SUPERUSER_PASSWORD="$DJANGO_SUPERUSER_PASSWORD" python manage.py createsuperuser \
+    --noinput \
+    --username "$DJANGO_SUPERUSER_USERNAME" \
+    --email "$DJANGO_SUPERUSER_EMAIL" 2>&1 || echo "WARNING: superuser creation skipped or failed"
+fi
 echo "Arrancando servidor..."
 if [ "$DEBUG" = "True" ]; then
   exec python manage.py runserver 0.0.0.0:8000
