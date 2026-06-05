@@ -115,7 +115,36 @@ class TestDatabasesConfig:
         assert db["PORT"] == "5432"
 
 
-# ── Task 2.3: Smart seed in entrypoint.sh ──────────────────────────────
+# ── Task 2.2: .env.example documentation ────────────────────────────────
+
+class TestEnvExample:
+    """Verify .env.example documents all required env vars."""
+
+    @pytest.fixture
+    def env_example_path(self):
+        return Path(__file__).resolve().parent.parent / ".env.example"
+
+    def test_datbase_url_documented(self, env_example_path):
+        """DATABASE_URL must be documented with usage hint."""
+        content = env_example_path.read_text()
+        assert "DATABASE_URL" in content, (
+            "DATABASE_URL not documented in .env.example"
+        )
+
+    def test_seed_demo_documented(self, env_example_path):
+        """SEED_DEMO must be documented with opt-in explanation."""
+        content = env_example_path.read_text()
+        assert "SEED_DEMO" in content, (
+            "SEED_DEMO not documented in .env.example"
+        )
+
+    def test_postgres_vars_retained(self, env_example_path):
+        """POSTGRES_* vars must still be present for local Docker."""
+        content = env_example_path.read_text()
+        assert "POSTGRES_DB" in content
+        assert "POSTGRES_USER" in content
+        assert "POSTGRES_HOST" in content
+        assert "POSTGRES_PORT" in content
 
 class TestEntrypointSeedLogic:
     """Verify entrypoint.sh guards seed_data with env vars."""
