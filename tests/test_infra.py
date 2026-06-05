@@ -195,3 +195,51 @@ class TestEntrypointSeedLogic:
         assert "[ -z \"$DATABASE_URL\" ] || [ \"$SEED_DEMO\" = \"True\" ]" in content, (
             "entrypoint.sh must use OR logic: local auto-seed OR production opt-in"
         )
+
+    def test_local_mode_triggers_seed(self):
+        """Local mode (no DATABASE_URL): seed must run."""
+        result = subprocess.run(
+            [
+                "sh", "-c",
+                'unset DATABASE_URL; unset SEED_DEMO; '
+                'if [ -z "$DATABASE_URL" ] || [ "$SEED_DEMO" = "True" ]; '
+                'then echo "SEED_RUN"; else echo "SEED_SKIP"; fi',
+            ],
+            capture_output=True,
+            text=True,
+        )
+        assert "SEED_RUN" in result.stdout, (
+            f"Local mode should trigger seed, got: {result.stdout}"
+        )
+
+    def test_production_mode_skips_seed(self):
+        """Production (DATABASE_URL set, SEED_DEMO unset): seed must skip."""
+        result = subprocess.run(
+            [
+                "sh", "-c",
+                'DATABASE_URL=postgres://x:y@host:5432/db; unset SEED_DEMO; '
+                'if [ -z "$DATABASE_URL" ] || [ "$SEED_DEMO" = "True" ]; '
+                'then echo "SEED_RUN"; else echo "SEED_SKIP"; fi',
+            ],
+            capture_output=True,
+            text=True,
+        )
+        assert "SEED_SKIP" in result.stdout, (
+            f"Production mode should skip seed, got: {result.stdout}"
+        )
+
+    def test_production_opt_in_triggers_seed(self):
+        """Production opt-in (DATABASE_URL set, SEED_DEMO=True): seed must run."""
+        result = subprocess.run(
+            [
+                "sh", "-c",
+                'DATABASE_URL=postgres://x:y@host:5432/db; SEED_DEMO=True; '
+                'if [ -z "$DATABASE_URL" ] || [ "$SEED_DEMO" = "True" ]; '
+                'then echo "SEED_RUN"; else echo "SEED_SKIP"; fi',
+            ],
+            capture_output=True,
+            text=True,
+        )
+        assert "SEED_RUN" in result.stdout, (
+            f"Production opt-in should trigger seed, got: {result.stdout}"
+        )
