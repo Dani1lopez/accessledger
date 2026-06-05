@@ -173,3 +173,25 @@ class TestEntrypointSeedLogic:
         assert "SEED_DEMO" in content, (
             "entrypoint.sh must reference SEED_DEMO for opt-in seeding"
         )
+
+    def test_seed_runs_when_database_url_empty(self, entrypoint_path):
+        """Local mode: -z DATABASE_URL triggers seed (no DATABASE_URL set)."""
+        content = entrypoint_path.read_text()
+        assert '-z "$DATABASE_URL"' in content, (
+            "entrypoint.sh must use -z to check empty DATABASE_URL for local auto-seed"
+        )
+
+    def test_seed_runs_when_seed_demo_true(self, entrypoint_path):
+        """Production opt-in: SEED_DEMO=True triggers seed explicitly."""
+        content = entrypoint_path.read_text()
+        assert '"$SEED_DEMO" = "True"' in content, (
+            "entrypoint.sh must check SEED_DEMO=True for production opt-in seeding"
+        )
+
+    def test_conditional_uses_or_logic(self, entrypoint_path):
+        """Both conditions use OR: local auto OR production opt-in."""
+        content = entrypoint_path.read_text()
+        # The if statement should use || between the two conditions
+        assert "[ -z \"$DATABASE_URL\" ] || [ \"$SEED_DEMO\" = \"True\" ]" in content, (
+            "entrypoint.sh must use OR logic: local auto-seed OR production opt-in"
+        )
