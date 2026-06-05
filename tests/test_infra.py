@@ -70,6 +70,50 @@ class TestDatabasesConfig:
         assert db["HOST"] == "pg.local"
         assert db["PORT"] == "5433"
 
+    def test_ssl_forced_even_when_url_lacks_sslmode(self, monkeypatch):
+        """DATABASE_URL without sslmode param still gets sslmode=require."""
+        monkeypatch.setenv(
+            "DATABASE_URL",
+            "postgres://u:p@neon.example:5432/db",
+        )
+        import accessledger.settings as s
+        importlib.reload(s)
+
+        db = s.DATABASES["default"]
+        assert db["OPTIONS"]["sslmode"] == "require"
+        assert db["OPTIONS"]["connect_timeout"] == 10
+        assert db["HOST"] == "neon.example"
+
+    def test_database_url_no_ssl_drops_in_pooled_url(self, monkeypatch):
+        """DATABASE_URL with non-standard port preserves it correctly."""
+        monkeypatch.setenv(
+            "DATABASE_URL",
+            "postgres://app:pass@ep-neon.us-east-2.aws.neon.tech:5432/appdb",
+        )
+        import accessledger.settings as s
+        importlib.reload(s)
+
+        db = s.DATABASES["default"]
+        assert db["PORT"] == 5432
+        assert db["NAME"] == "appdb"
+        assert db["USER"] == "app"
+        assert db["CONN_MAX_AGE"] == 60
+        
+    def test_postgres_fallback_keeps_default_port(self, monkeypatch):
+        """When POSTGRES_PORT is not set, default port 5432 is used."""
+        monkeypatch.delenv("DATABASE_URL", raising=False)
+        monkeypatch.delenv("POSTGRES_PORT", raising=False)
+        monkeypatch.setenv("POSTGRES_DB", "mydb")
+        monkeypatch.setenv("POSTGRES_USER", "myuser")
+        monkeypatch.setenv("POSTGRES_PASSWORD", "mypass")
+        monkeypatch.setenv("POSTGRES_HOST", "dbhost")
+
+        import accessledger.settings as s
+        importlib.reload(s)
+
+        db = s.DATABASES["default"]
+        assert db["PORT"] == "5432"
+
 
 # ── Task 2.3: Smart seed in entrypoint.sh ──────────────────────────────
 
