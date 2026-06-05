@@ -8,7 +8,7 @@
 ![Django](https://img.shields.io/badge/Django-5.2-092E20?logo=django&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)
-![Railway](https://img.shields.io/badge/Deployed-Railway-8B5CF6?logo=railway&logoColor=white)
+![Render](https://img.shields.io/badge/Deployed-Render-46E3B7?logo=render&logoColor=white)
 
 🌐 [Live Demo](https://web-production-0ea6.up.railway.app)
 
@@ -389,9 +389,9 @@ POSTGRES_HOST=127.0.0.1 POSTGRES_PORT=5434 pytest -v
 
 | Item | Detail |
 | ---- | ------ |
-| **Platform** | Railway |
+| **Platform** | Render |
 | **Auto-deploy** | On every push to `main` |
-| **Database** | PostgreSQL managed by Railway |
+| **Database** | PostgreSQL managed by Render |
 | **Static files** | Served by WhiteNoise |
 | **WSGI server** | Gunicorn |
 | **Startup** | Migrations and `collectstatic` run automatically on container start via `entrypoint.sh` |
@@ -407,7 +407,7 @@ POSTGRES_HOST=127.0.0.1 POSTGRES_PORT=5434 pytest -v
 - [ ] Email notifications for grants nearing expiration
 - [ ] Two-factor authentication (2FA)
 - [ ] Audit log export (CSV / PDF)
-- [x] Production deployment on Railway
+- [x] Production deployment on Render
 
 ---
 
