@@ -7,6 +7,76 @@ from datetime import timedelta
 
 
 @pytest.mark.django_db
+class TestUserCanModifyResourceHelper:
+    """Unit tests for the user_can_modify_resource pure function."""
+
+    def test_superuser_always_allowed(self):
+        from core.permissions import user_can_modify_resource
+        superuser = User.objects.create_superuser(
+            username="su1", password="pass", email="su1@x.com"
+        )
+        resource = Resource.objects.create(
+            name="r1", resource_type="server"
+        )
+        assert user_can_modify_resource(superuser, resource) is True
+
+    def test_admin_group_always_allowed(self):
+        from core.permissions import user_can_modify_resource
+        group, _ = Group.objects.get_or_create(name="admin")
+        admin_user = User.objects.create_user(username="adm", password="pass")
+        admin_user.groups.add(group)
+        resource = Resource.objects.create(
+            name="r2", resource_type="server"
+        )
+        assert user_can_modify_resource(admin_user, resource) is True
+
+    def test_owner_can_modify_own_resource(self):
+        from core.permissions import user_can_modify_resource
+        editor = User.objects.create_user(username="ed", password="pass")
+        resource = Resource.objects.create(
+            name="r3", resource_type="server", owner=editor
+        )
+        assert user_can_modify_resource(editor, resource) is True
+
+    def test_non_owner_cannot_modify_others_resource(self):
+        from core.permissions import user_can_modify_resource
+        editor = User.objects.create_user(username="ed2", password="pass")
+        other = User.objects.create_user(username="other", password="pass")
+        resource = Resource.objects.create(
+            name="r4", resource_type="server", owner=other
+        )
+        assert user_can_modify_resource(editor, resource) is False
+
+    def test_orphan_resource_denied_for_regular_user(self):
+        from core.permissions import user_can_modify_resource
+        editor = User.objects.create_user(username="ed3", password="pass")
+        resource = Resource.objects.create(
+            name="r5", resource_type="server", owner=None
+        )
+        assert user_can_modify_resource(editor, resource) is False
+
+    def test_admin_can_modify_orphan_resource(self):
+        from core.permissions import user_can_modify_resource
+        group, _ = Group.objects.get_or_create(name="admin")
+        admin_user = User.objects.create_user(username="adm2", password="pass")
+        admin_user.groups.add(group)
+        resource = Resource.objects.create(
+            name="r6", resource_type="server", owner=None
+        )
+        assert user_can_modify_resource(admin_user, resource) is True
+
+    def test_superuser_can_modify_orphan_resource(self):
+        from core.permissions import user_can_modify_resource
+        superuser = User.objects.create_superuser(
+            username="su2", password="pass", email="su2@x.com"
+        )
+        resource = Resource.objects.create(
+            name="r7", resource_type="server", owner=None
+        )
+        assert user_can_modify_resource(superuser, resource) is True
+
+
+@pytest.mark.django_db
 class TestResourceListView:
     def test_redirects_if_not_logged_in(self, client):
         response = client.get("/resources/")
