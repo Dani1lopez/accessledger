@@ -7,6 +7,76 @@ from datetime import timedelta
 
 
 @pytest.mark.django_db
+class TestUserCanModifyResourceHelper:
+    """Unit tests for the user_can_modify_resource pure function."""
+
+    def test_superuser_always_allowed(self):
+        from core.permissions import user_can_modify_resource
+        superuser = User.objects.create_superuser(
+            username="su1", password="pass", email="su1@x.com"
+        )
+        resource = Resource.objects.create(
+            name="r1", resource_type="server"
+        )
+        assert user_can_modify_resource(superuser, resource) is True
+
+    def test_admin_group_always_allowed(self):
+        from core.permissions import user_can_modify_resource
+        group, _ = Group.objects.get_or_create(name="admin")
+        admin_user = User.objects.create_user(username="adm", password="pass")
+        admin_user.groups.add(group)
+        resource = Resource.objects.create(
+            name="r2", resource_type="server"
+        )
+        assert user_can_modify_resource(admin_user, resource) is True
+
+    def test_owner_can_modify_own_resource(self):
+        from core.permissions import user_can_modify_resource
+        editor = User.objects.create_user(username="ed", password="pass")
+        resource = Resource.objects.create(
+            name="r3", resource_type="server", owner=editor
+        )
+        assert user_can_modify_resource(editor, resource) is True
+
+    def test_non_owner_cannot_modify_others_resource(self):
+        from core.permissions import user_can_modify_resource
+        editor = User.objects.create_user(username="ed2", password="pass")
+        other = User.objects.create_user(username="other", password="pass")
+        resource = Resource.objects.create(
+            name="r4", resource_type="server", owner=other
+        )
+        assert user_can_modify_resource(editor, resource) is False
+
+    def test_orphan_resource_denied_for_regular_user(self):
+        from core.permissions import user_can_modify_resource
+        editor = User.objects.create_user(username="ed3", password="pass")
+        resource = Resource.objects.create(
+            name="r5", resource_type="server", owner=None
+        )
+        assert user_can_modify_resource(editor, resource) is False
+
+    def test_admin_can_modify_orphan_resource(self):
+        from core.permissions import user_can_modify_resource
+        group, _ = Group.objects.get_or_create(name="admin")
+        admin_user = User.objects.create_user(username="adm2", password="pass")
+        admin_user.groups.add(group)
+        resource = Resource.objects.create(
+            name="r6", resource_type="server", owner=None
+        )
+        assert user_can_modify_resource(admin_user, resource) is True
+
+    def test_superuser_can_modify_orphan_resource(self):
+        from core.permissions import user_can_modify_resource
+        superuser = User.objects.create_superuser(
+            username="su2", password="pass", email="su2@x.com"
+        )
+        resource = Resource.objects.create(
+            name="r7", resource_type="server", owner=None
+        )
+        assert user_can_modify_resource(superuser, resource) is True
+
+
+@pytest.mark.django_db
 class TestResourceListView:
     def test_redirects_if_not_logged_in(self, client):
         response = client.get("/resources/")
@@ -61,6 +131,228 @@ class TestResourceDeleteView:
             f"/resources/{resource.pk}/delete/", HTTP_X_REQUESTED_WITH="XMLHttpRequest"
         )
         assert response.status_code == 200
+
+    def test_editor_owns_can_delete(self, client):
+        group, _ = Group.objects.get_or_create(name="editor-del")
+        perm = Permission.objects.get(codename="delete_resource")
+        group.permissions.add(perm)
+        editor = User.objects.create_user(username="edel", password="pass")
+        editor.profile.must_change_password = False
+        editor.profile.save()
+        editor.groups.add(group)
+        client.login(username="edel", password="pass")
+
+        resource = Resource.objects.create(
+            name="del-own", resource_type="server", owner=editor
+        )
+        response = client.post(
+            f"/resources/{resource.pk}/delete/",
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        assert response.status_code == 200
+
+    def test_editor_cannot_delete_others(self, client):
+        group, _ = Group.objects.get_or_create(name="editor-del2")
+        perm = Permission.objects.get(codename="delete_resource")
+        group.permissions.add(perm)
+        editor = User.objects.create_user(username="edel2", password="pass")
+        editor.profile.must_change_password = False
+        editor.profile.save()
+        editor.groups.add(group)
+        client.login(username="edel2", password="pass")
+
+        other = User.objects.create_user(username="otherdel", password="pass")
+        resource = Resource.objects.create(
+            name="del-other", resource_type="server", owner=other
+        )
+        response = client.post(
+            f"/resources/{resource.pk}/delete/",
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        assert response.status_code == 403
+
+    def test_superuser_can_delete_any(self, client):
+        superuser = User.objects.create_superuser(
+            username="su5", password="pass", email="su5@x.com"
+        )
+        superuser.profile.must_change_password = False
+        superuser.profile.save()
+        client.login(username="su5", password="pass")
+
+        other = User.objects.create_user(username="otherdel2", password="pass")
+        resource = Resource.objects.create(
+            name="del-su", resource_type="server", owner=other
+        )
+        response = client.post(
+            f"/resources/{resource.pk}/delete/",
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        assert response.status_code == 200
+
+    def test_editor_cannot_delete_orphan(self, client):
+        group, _ = Group.objects.get_or_create(name="editor-del3")
+        perm = Permission.objects.get(codename="delete_resource")
+        group.permissions.add(perm)
+        editor = User.objects.create_user(username="edel3", password="pass")
+        editor.profile.must_change_password = False
+        editor.profile.save()
+        editor.groups.add(group)
+        client.login(username="edel3", password="pass")
+
+        resource = Resource.objects.create(
+            name="del-orph", resource_type="server", owner=None
+        )
+        response = client.post(
+            f"/resources/{resource.pk}/delete/",
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        assert response.status_code == 403
+
+
+@pytest.mark.django_db
+class TestResourceUpdateView:
+    """Ownership gating on resource_update view."""
+
+    def test_editor_owns_resource_get(self, editor_client):
+        editor = User.objects.get(username="editor1")
+        resource = Resource.objects.create(
+            name="ed-own-get", resource_type="server", environment="dev", owner=editor
+        )
+        response = editor_client.get(f"/resources/{resource.pk}/edit/")
+        assert response.status_code == 200
+
+    def test_editor_owns_resource_post(self, editor_client):
+        editor = User.objects.get(username="editor1")
+        resource = Resource.objects.create(
+            name="ed-own-post", resource_type="server", environment="dev", owner=editor
+        )
+        response = editor_client.post(
+            f"/resources/{resource.pk}/edit/",
+            data={
+                "name": "ed-own-post",
+                "resource_type": "server",
+                "environment": "prod",
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        assert response.status_code == 200
+
+    def test_editor_cannot_edit_others_resource(self, editor_client):
+        other = User.objects.create_user(username="othered", password="pass")
+        resource = Resource.objects.create(
+            name="others-ed", resource_type="server", environment="dev", owner=other
+        )
+        response = editor_client.get(f"/resources/{resource.pk}/edit/")
+        assert response.status_code == 403
+
+    def test_admin_can_edit_any_resource(self, admin_client):
+        other = User.objects.create_user(username="othered2", password="pass")
+        resource = Resource.objects.create(
+            name="admin-any", resource_type="server", environment="dev", owner=other
+        )
+        response = admin_client.get(f"/resources/{resource.pk}/edit/")
+        assert response.status_code == 200
+
+    def test_superuser_can_edit_any_resource(self, client):
+        superuser = User.objects.create_superuser(
+            username="su3", password="pass", email="su3@x.com"
+        )
+        superuser.profile.must_change_password = False
+        superuser.profile.save()
+        client.login(username="su3", password="pass")
+        other = User.objects.create_user(username="othered3", password="pass")
+        resource = Resource.objects.create(
+            name="su-any", resource_type="server", environment="dev", owner=other
+        )
+        response = client.get(f"/resources/{resource.pk}/edit/")
+        assert response.status_code == 200
+
+    def test_editor_cannot_edit_orphan_resource(self, editor_client):
+        resource = Resource.objects.create(
+            name="orph-ed", resource_type="server", environment="dev", owner=None
+        )
+        response = editor_client.get(f"/resources/{resource.pk}/edit/")
+        assert response.status_code == 403
+
+    def test_admin_can_edit_orphan_resource(self, admin_client):
+        resource = Resource.objects.create(
+            name="orph-adm", resource_type="server", environment="dev", owner=None
+        )
+        response = admin_client.get(f"/resources/{resource.pk}/edit/")
+        assert response.status_code == 200
+
+
+@pytest.mark.django_db
+class TestResourceDataView:
+    """Ownership gating on resource_data JSON endpoint."""
+
+    def test_editor_owns_returns_json(self, editor_client):
+        editor = User.objects.get(username="editor1")
+        resource = Resource.objects.create(
+            name="data-own", resource_type="server", environment="dev", owner=editor
+        )
+        response = editor_client.get(f"/resources/{resource.pk}/data/")
+        assert response.status_code == 200
+        assert response["Content-Type"] == "application/json"
+
+    def test_editor_not_owner_returns_403(self, editor_client):
+        other = User.objects.create_user(username="otherdata", password="pass")
+        resource = Resource.objects.create(
+            name="data-other", resource_type="server", environment="dev", owner=other
+        )
+        response = editor_client.get(f"/resources/{resource.pk}/data/")
+        assert response.status_code == 403
+
+    def test_superuser_returns_json(self, client):
+        superuser = User.objects.create_superuser(
+            username="su4", password="pass", email="su4@x.com"
+        )
+        superuser.profile.must_change_password = False
+        superuser.profile.save()
+        client.login(username="su4", password="pass")
+        other = User.objects.create_user(username="otherdata2", password="pass")
+        resource = Resource.objects.create(
+            name="data-su", resource_type="server", environment="dev", owner=other
+        )
+        response = client.get(f"/resources/{resource.pk}/data/")
+        assert response.status_code == 200
+        assert response["Content-Type"] == "application/json"
+
+
+@pytest.mark.django_db
+class TestResourceDetailView:
+    """can_modify context boolean in resource_detail view."""
+
+    def test_can_modify_true_for_owner(self, editor_client):
+        editor = User.objects.get(username="editor1")
+        resource = Resource.objects.create(
+            name="det-own", resource_type="server", environment="dev", owner=editor
+        )
+        response = editor_client.get(f"/resources/{resource.pk}/")
+        assert response.status_code == 200
+        content = response.content.decode()
+        # Edit button should be present when can_modify is True
+        assert 'id="btnEditResource"' in content
+
+    def test_can_modify_false_for_non_owner(self, editor_client):
+        other = User.objects.create_user(username="otherdet", password="pass")
+        resource = Resource.objects.create(
+            name="det-other", resource_type="server", environment="dev", owner=other
+        )
+        response = editor_client.get(f"/resources/{resource.pk}/")
+        assert response.status_code == 200
+        content = response.content.decode()
+        # Edit button should NOT be present when can_modify is False
+        assert 'id="btnEditResource"' not in content
+
+    def test_can_modify_false_for_orphan_editor(self, editor_client):
+        resource = Resource.objects.create(
+            name="det-orph", resource_type="server", environment="dev", owner=None
+        )
+        response = editor_client.get(f"/resources/{resource.pk}/")
+        assert response.status_code == 200
+        content = response.content.decode()
+        assert 'id="btnEditResource"' not in content
 
 
 @pytest.mark.django_db
