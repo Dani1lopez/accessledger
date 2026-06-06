@@ -1,8 +1,10 @@
 from django.shortcuts import redirect, render, get_object_or_404
 from django.contrib.auth.decorators import permission_required, login_required
+from django.core.exceptions import PermissionDenied
 from django.http import JsonResponse, HttpResponseNotAllowed
 from core.decorators import admin_required
 from core.forms import AccessGrantForm, ResourceForm, UserForm, UserCreateForm
+from core.permissions import user_can_modify_resource
 from .models import AccessGrant, Resource, Profile, AuditLog
 from django.contrib.auth.models import User, Group
 from django.contrib.auth.views import PasswordChangeView
@@ -40,6 +42,7 @@ def resource_detail(request, pk):
         {
             "resource": resource,
             "grants": grants,
+            "can_modify": user_can_modify_resource(request.user, resource),
         },
     )
 
@@ -82,6 +85,8 @@ def resource_create(request):
 def resource_update(request, pk):
     is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
     resource = get_object_or_404(Resource, pk=pk)
+    if not user_can_modify_resource(request.user, resource):
+        raise PermissionDenied
     before = {
         "name": resource.name,
         "resource_type": resource.resource_type,
@@ -127,6 +132,8 @@ def resource_update(request, pk):
 @permission_required("core.change_resource", raise_exception=True)
 def resource_data(request, pk):
     resource = get_object_or_404(Resource, pk=pk)
+    if not user_can_modify_resource(request.user, resource):
+        raise PermissionDenied
     return JsonResponse(
         {
             "name": resource.name,
@@ -142,6 +149,8 @@ def resource_data(request, pk):
 @permission_required("core.delete_resource", raise_exception=True)
 def resource_delete(request, pk):
     resource = get_object_or_404(Resource, pk=pk)
+    if not user_can_modify_resource(request.user, resource):
+        raise PermissionDenied
     if request.method == "POST":
         before = {
             "name": resource.name,
