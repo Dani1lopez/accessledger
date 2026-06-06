@@ -17,9 +17,9 @@
     </p>
   </div>
 
-  {% if perms.core.change_resource or perms.core.delete_resource %}
+  {% if can_modify %}
     <div class="hero__right" style="display:flex; align-items:flex-start; gap:8px; padding-top:8px;">
-      {% if perms.core.change_resource %}
+      {% if can_modify %}
         <button id="btnEditResource"
                 data-pk="{{ resource.pk }}"
                 data-url-data="{% url 'resource_data' resource.pk %}"
@@ -28,7 +28,7 @@
           Editar
         </button>
       {% endif %}
-      {% if perms.core.delete_resource %}
+      {% if can_modify %}
         <button id="btnDeleteResource"
                 data-name="{{ resource.name }}"
                 data-url-delete="{% url 'resource_delete' resource.pk %}"
@@ -158,7 +158,7 @@
 </section>
 
 {# ── Modal: Editar recurso ── #}
-{% if perms.core.change_resource %}
+{% if can_modify %}
 <dialog id="modalEditResource">
   <div class="modal__header">
     <span class="modal__title">Editar recurso</span>
@@ -228,7 +228,7 @@
 {% endif %}
 
 {# ── Modal: Borrar recurso ── #}
-{% if perms.core.delete_resource %}
+{% if can_modify %}
 <dialog id="modalDeleteResource">
   <div class="modal__header">
     <span class="modal__title" style="color:rgba(255,80,90,.85);">Borrar recurso</span>
