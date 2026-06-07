@@ -829,3 +829,37 @@ class TestPasswordChangeAuditLog:
         assert AuditLog.objects.filter(
             action="password_changed", user=user
         ).exists()
+
+
+@pytest.mark.django_db
+class TestCustomPasswordChangeView:
+    """Verify CustomPasswordChangeView behavior: clears flag and redirects."""
+
+    def test_password_change_success_sets_must_change_false(self, forced_password_client):
+        """After successful password change, must_change_password becomes False."""
+        from django.contrib.auth.models import User
+        response = forced_password_client.post(
+            "/password/change/",
+            data={
+                "old_password": "ForcedPass123!",
+                "new_password1": "Newpass123!",
+                "new_password2": "Newpass123!",
+            },
+        )
+        assert response.status_code == 302
+        user = User.objects.get(username="forced1")
+        user.profile.refresh_from_db()
+        assert user.profile.must_change_password is False
+
+    def test_password_change_success_redirects_to_resource_list(self, forced_password_client):
+        """After successful password change, user is redirected to resource list."""
+        response = forced_password_client.post(
+            "/password/change/",
+            data={
+                "old_password": "ForcedPass123!",
+                "new_password1": "Newpass123!",
+                "new_password2": "Newpass123!",
+            },
+        )
+        assert response.status_code == 302
+        assert response.url == "/resources/"
