@@ -56,7 +56,12 @@
     {% endif %}
 
     {# ── Mobile meta (visible only at ≤480px) ── #}
-    <span class="pagination__meta" aria-hidden="true">
+    {# Polite live region: on mobile it shows position; on desktop it  #}
+    {# stays visually hidden but screen readers still announce the    #}
+    {# new page number after an HTMX swap.                             #}
+    <span class="pagination__meta"
+          role="status"
+          aria-live="polite">
       Página {{ page_obj.number }} de {{ paginator.num_pages }}
     </span>
   </nav>

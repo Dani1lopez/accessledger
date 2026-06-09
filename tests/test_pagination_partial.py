@@ -17,6 +17,12 @@ and assert on the structural HTML it produces. The partial must:
 - Preserve the current query string when building ``href``/``hx-get`` URLs
   so search/filter parameters survive a page change.
 - Render nothing when there is only one page.
+- Expose a polite live region (a11y polish) so screen readers announce
+  the new page after an HTMX swap.
+- Keep the navigation region at a single tab stop in/out via the
+  ``<nav>`` landmark, and not steal focus from the result list after
+  a swap (handled at the layout level — asserted here only as a
+  structural property of the partial).
 """
 import pytest
 from django.core.paginator import Paginator
@@ -282,3 +288,129 @@ class TestPaginationPartialQueryString:
         assert "page=2&page=" not in html
         # Page 1 link should appear
         assert "page=1" in html
+
+
+@pytest.mark.django_db
+class TestPaginationPartialA11yPolish:
+    """Accessibility polish — live region + focus-safe markup.
+
+    Phase 4 of the pagination-redesign change promotes the meta line to
+    a polite live region so screen-reader users hear the new page
+    number after an HTMX swap, and confirms the current page and
+    disabled prev/next are not in the keyboard tab order.
+    """
+
+    def test_meta_line_is_polite_live_region(self):
+        """The meta line must be a polite live region for SR announcements."""
+        rf = RequestFactory()
+        request = rf.get("/resources/")
+        resources = _make_resources(12)
+        page_obj, paginator = _make_page(resources, page=2, per_page=5)
+
+        html = _render_pagination(request, page_obj, paginator)
+
+        assert 'class="pagination__meta"' in html
+        assert 'aria-live="polite"' in html
+
+    def test_meta_line_has_status_role(self):
+        """role=status ties the live region to its implicit aria-live=polite."""
+        rf = RequestFactory()
+        request = rf.get("/resources/")
+        resources = _make_resources(12)
+        page_obj, paginator = _make_page(resources, page=1, per_page=5)
+
+        html = _render_pagination(request, page_obj, paginator)
+
+        # The status role and the aria-live attribute belong to the meta span
+        # (or the live region surrounding it). Either form is acceptable.
+        assert ('role="status"' in html and 'aria-live="polite"' in html), (
+            "Meta line must be a polite status live region for SR announcements"
+        )
+
+    def test_current_page_is_not_in_tab_order(self):
+        """The current page is a <span>; spans are not focusable by default.
+
+        We assert the structural property (the current page is rendered
+        as a non-anchor element) so that keyboard users tab *past* it
+        onto the next interactive control.
+        """
+        rf = RequestFactory()
+        request = rf.get("/resources/")
+        resources = _make_resources(12)
+        page_obj, paginator = _make_page(resources, page=2, per_page=5)
+
+        html = _render_pagination(request, page_obj, paginator)
+
+        # The current page must be a <span> with aria-current, NOT an <a>.
+        assert (
+            '<span class="pagination__link pagination__link--current"' in html
+        )
+        # It must not have an href (no anchor)
+        assert (
+            'class="pagination__link pagination__link--current" href' not in html
+        )
+
+    def test_disabled_prev_is_not_in_tab_order(self):
+        """Disabled prev must be a <span>, not an <a>."""
+        rf = RequestFactory()
+        request = rf.get("/resources/")
+        resources = _make_resources(12)
+        page_obj, paginator = _make_page(resources, page=1, per_page=5)
+
+        html = _render_pagination(request, page_obj, paginator)
+
+        # Disabled prev is a span with aria-disabled
+        assert (
+            '<span class="pagination__link pagination__link--prev'
+            ' pagination__link--disabled"' in html
+        )
+        # It must not be a clickable anchor
+        assert (
+            'class="pagination__link pagination__link--prev'
+            ' pagination__link--disabled" href' not in html
+        )
+
+    def test_disabled_next_is_not_in_tab_order(self):
+        """Disabled next must be a <span>, not an <a>."""
+        rf = RequestFactory()
+        request = rf.get("/resources/")
+        resources = _make_resources(12)
+        page_obj, paginator = _make_page(resources, page=3, per_page=5)
+
+        html = _render_pagination(request, page_obj, paginator)
+
+        # Disabled next is a span with aria-disabled
+        assert (
+            '<span class="pagination__link pagination__link--next'
+            ' pagination__link--disabled"' in html
+        )
+        # It must not be a clickable anchor
+        assert (
+            'class="pagination__link pagination__link--next'
+            ' pagination__link--disabled" href' not in html
+        )
+
+    def test_ellipsis_is_hidden_from_screen_readers(self):
+        """Ellipsis is a visual gap; it must not be announced."""
+        rf = RequestFactory()
+        request = rf.get("/resources/")
+        resources = _make_resources(50)
+        page_obj, paginator = _make_page(resources, page=5, per_page=5)
+
+        html = _render_pagination(request, page_obj, paginator)
+
+        # Find the ellipsis span and assert it is aria-hidden
+        assert 'class="pagination__ellipsis" aria-hidden="true"' in html
+
+    def test_landmark_announces_pagination_region(self):
+        """The <nav> must have a Spanish aria-label so SRs announce 'Paginación'."""
+        rf = RequestFactory()
+        request = rf.get("/resources/")
+        resources = _make_resources(12)
+        page_obj, paginator = _make_page(resources, page=2, per_page=5)
+
+        html = _render_pagination(request, page_obj, paginator)
+
+        # Already covered by another test, repeated here for the a11y group
+        assert '<nav class="pagination"' in html
+        assert 'aria-label="Paginación"' in html

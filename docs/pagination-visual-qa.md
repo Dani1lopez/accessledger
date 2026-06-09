@@ -117,7 +117,8 @@ at iPhone SE 375px).
   dimmed" or similar (`aria-disabled="true"`)
 - [ ] The ellipsis is **not** announced (`aria-hidden="true"`)
 - [ ] The meta line "Página X de Y" is announced as a polite live
-  region update after a swap (if `aria-live="polite"` is present)
+  region update after a swap (it carries `role="status"` and
+  `aria-live="polite"`)
 
 ### Reduced motion
 - [ ] Enable OS-level "Reduce motion"
