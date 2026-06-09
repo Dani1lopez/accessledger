@@ -1346,3 +1346,108 @@ class TestUserManagementPagination:
         assert 'id="modalEditUser"' in content
         # Pagination must also be present
         assert 'class="pagination"' in content
+
+
+@pytest.mark.django_db
+class TestResourceListPagination:
+    """Integration tests for the paginated resource_list view."""
+
+    @staticmethod
+    def _make_resources(n: int) -> None:
+        Resource.objects.bulk_create(
+            [Resource(name=f"r-pg-{i:02d}", resource_type="server") for i in range(1, n + 1)]
+        )
+
+    @staticmethod
+    def _resource_names_in(content: str) -> set[str]:
+        return set(re.findall(r'r-pg-\d+', content))
+
+    def test_resource_list_pagination_renders_only_one_page_of_rows(self, viewer_client):
+        """When more than 20 resources exist, page 1 renders 20 rows."""
+        self._make_resources(25)
+        response = viewer_client.get("/resources/")
+        assert response.status_code == 200
+        names = self._resource_names_in(response.content.decode())
+
+        # Page 1: r-pg-01..r-pg-20
+        for i in range(1, 21):
+            assert f"r-pg-{i:02d}" in names, f"r-pg-{i:02d} should appear on page 1"
+        # r-pg-21..r-pg-25 must NOT be on page 1
+        for i in range(21, 26):
+            assert f"r-pg-{i:02d}" not in names, f"r-pg-{i:02d} should NOT appear on page 1"
+
+    def test_resource_list_pagination_page_param_returns_correct_slice(self, viewer_client):
+        """?page=2 returns the remaining 5 resources."""
+        self._make_resources(25)
+        response = viewer_client.get("/resources/?page=2")
+        assert response.status_code == 200
+        names = self._resource_names_in(response.content.decode())
+
+        for i in range(21, 26):
+            assert f"r-pg-{i:02d}" in names, f"r-pg-{i:02d} should appear on page 2"
+        # r-pg-01 must NOT be on page 2
+        assert "r-pg-01" not in names
+
+    def test_resource_list_pagination_out_of_range_returns_last_page(self, viewer_client):
+        """?page=999 falls back to the last valid page (no 404)."""
+        self._make_resources(25)
+        response = viewer_client.get("/resources/?page=999")
+        assert response.status_code == 200
+        names = self._resource_names_in(response.content.decode())
+
+        # Last page: r-pg-21..r-pg-25
+        for i in range(21, 26):
+            assert f"r-pg-{i:02d}" in names
+
+    def test_resource_list_pagination_renders_pagination_partial(self, viewer_client):
+        """The _pagination.html partial must be present in the response."""
+        self._make_resources(25)
+        response = viewer_client.get("/resources/")
+        assert response.status_code == 200
+        content = response.content.decode()
+
+        assert 'class="pagination"' in content
+        assert "page=2" in content
+
+    def test_resource_list_pagination_iterates_page_obj(self, viewer_client):
+        """Template iterates page_obj (not 'resources') so pagination works."""
+        self._make_resources(25)
+        response = viewer_client.get("/resources/?page=2")
+        assert response.status_code == 200
+        names = self._resource_names_in(response.content.decode())
+
+        # r-pg-25 is alphabetically last → on page 2
+        assert "r-pg-25" in names
+        # r-pg-01 is alphabetically first → on page 1
+        assert "r-pg-01" not in names
+
+    def test_resource_list_htmx_partial_preserves_modal(self, viewer_client):
+        """HTMX partial for resources keeps the new-resource modal after pagination."""
+        # viewer cannot create, so we need a user with add_resource perm
+        # to verify the modal renders. Use editor_client instead.
+        from django.contrib.auth.models import User, Group, Permission
+        from django.test import Client
+
+        add_perm = Permission.objects.get(codename="add_resource")
+        view_perm = Permission.objects.get(codename="view_resource")
+        group = Group.objects.create(name="resource-pg-editor")
+        group.permissions.add(view_perm)
+        group.permissions.add(add_perm)
+        user = User.objects.create_user(username="rpg-editor", password="pass")
+        user.profile.must_change_password = False
+        user.profile.save()
+        user.groups.add(group)
+        client = Client()
+        client.login(username="rpg-editor", password="pass")
+
+        self._make_resources(25)
+        response = client.get("/resources/?page=2", HTTP_HX_REQUEST="true")
+        assert response.status_code == 200
+        content = response.content.decode()
+
+        # Partial response
+        assert "<html" not in content
+        # Modal must survive
+        assert 'id="modalNewResource"' in content
+        # Pagination must also be present
+        assert 'class="pagination"' in content

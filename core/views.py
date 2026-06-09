@@ -30,6 +30,7 @@ def _paginate(request, qs):
 @permission_required("core.view_resource", raise_exception=True)
 def resource_list(request):
     resources = Resource.objects.all().order_by("name")
+    page_obj, paginator = _paginate(request, resources)
     if request.htmx:
         template = "core/_resource_table.html"
     else:
@@ -37,7 +38,12 @@ def resource_list(request):
     return render(
         request,
         template,
-        {"resources": resources, "form": ResourceForm()},
+        {
+            "page_obj": page_obj,
+            "paginator": paginator,
+            "form": ResourceForm(),
+            "page_url_name": "resource_list",
+        },
     )
 
 
