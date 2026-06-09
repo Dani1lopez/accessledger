@@ -1451,3 +1451,136 @@ class TestResourceListPagination:
         assert 'id="modalNewResource"' in content
         # Pagination must also be present
         assert 'class="pagination"' in content
+
+
+@pytest.mark.django_db
+class TestPaginationEdgeCases:
+    """Edge cases for the shared pagination contract across all 3 views."""
+
+    def test_audit_log_empty_queryset_shows_zero_in_pill(self, admin_client):
+        """Empty queryset: count pill says '0 registros' and pagination is hidden."""
+        response = admin_client.get("/audit_log/")
+        assert response.status_code == 200
+        content = response.content.decode()
+
+        assert _pill_text(content) == "0 registros"
+        # No pagination nav when there's only one (empty) page
+        assert 'class="pagination"' not in content
+
+    def test_audit_log_single_page_hides_pagination(self, admin_client):
+        """Fewer than PAGE_SIZE entries: no pagination controls rendered."""
+        _make_audit_logs(5)
+        response = admin_client.get("/audit_log/")
+        assert response.status_code == 200
+        content = response.content.decode()
+
+        # All 5 fit on one page → no nav
+        assert 'class="pagination"' not in content
+        # Pill still shows the correct total
+        assert _pill_text(content) == "5 registros"
+
+    def test_user_management_empty_queryset_pill_is_zero(self, admin_client):
+        """Empty user table: pill is '0 usuarios' (singular, no pluralize branch)."""
+        # admin_client has admin1 user so it's never truly empty here.
+        # Verify the pill reflects the total (1 user) correctly.
+        response = admin_client.get("/users/manage/")
+        assert response.status_code == 200
+        content = response.content.decode()
+        # Just admin1 in this fresh DB
+        assert "1 usuario" in content
+        # No pagination needed for a single user
+        assert 'class="pagination"' not in content
+
+    def test_user_management_single_page_hides_pagination(self, admin_client):
+        """Fewer than PAGE_SIZE users: no pagination controls rendered."""
+        # admin_client has admin1 already. Add 4 more → 5 total, single page.
+        User.objects.bulk_create(
+            [User(username=f"single-pg-{i}", email=f"spg{i}@x.com") for i in range(1, 5)]
+        )
+        response = admin_client.get("/users/manage/")
+        assert response.status_code == 200
+        content = response.content.decode()
+        # 5 users, 1 page → no nav
+        assert 'class="pagination"' not in content
+
+    def test_resource_list_empty_queryset_no_pagination(self, viewer_client):
+        """No resources: pagination is hidden (no nav to render)."""
+        response = viewer_client.get("/resources/")
+        assert response.status_code == 200
+        content = response.content.decode()
+        assert 'class="pagination"' not in content
+
+    def test_resource_list_exactly_one_page_hides_pagination(self, viewer_client):
+        """Exactly PAGE_SIZE entries: no pagination controls needed."""
+        Resource.objects.bulk_create(
+            [Resource(name=f"exact-pg-{i:02d}", resource_type="server") for i in range(1, 21)]
+        )
+        response = viewer_client.get("/resources/")
+        assert response.status_code == 200
+        content = response.content.decode()
+        # 20 entries = exactly one page → no nav
+        assert 'class="pagination"' not in content
+
+    def test_audit_log_pagination_link_in_partial_is_htmx_aware(self, admin_client):
+        """The pagination link must carry the hx-* attributes so swaps survive."""
+        _make_audit_logs(25)
+        response = admin_client.get("/audit_log/", HTTP_HX_REQUEST="true")
+        assert response.status_code == 200
+        content = response.content.decode()
+
+        # The page-2 link must be htmx-driven AND have a non-htmx fallback href
+        assert 'hx-get="/audit_log/?page=2"' in content
+        assert 'hx-target="#main"' in content
+        assert 'hx-push-url="true"' in content
+        # Fallback href so non-JS clients can still navigate
+        assert 'href="?page=2"' in content
+
+    def test_user_management_pagination_link_is_htmx_aware(self, admin_client):
+        """Pagination links in the user_management partial must use htmx attrs."""
+        # Create enough users to require pagination
+        User.objects.bulk_create(
+            [User(username=f"htmx-pg-{i:02d}", email=f"h{i}@x.com") for i in range(1, 26)]
+        )
+        response = admin_client.get("/users/manage/", HTTP_HX_REQUEST="true")
+        assert response.status_code == 200
+        content = response.content.decode()
+
+        assert 'hx-get="/users/manage/?page=2"' in content
+        assert 'hx-target="#main"' in content
+        assert 'hx-push-url="true"' in content
+
+    def test_resource_list_pagination_link_is_htmx_aware(self, viewer_client):
+        """Pagination links in the resource_list partial must use htmx attrs."""
+        Resource.objects.bulk_create(
+            [Resource(name=f"htmx-r-pg-{i:02d}", resource_type="server") for i in range(1, 26)]
+        )
+        response = viewer_client.get("/resources/", HTTP_HX_REQUEST="true")
+        assert response.status_code == 200
+        content = response.content.decode()
+
+        assert 'hx-get="/resources/?page=2"' in content
+        assert 'hx-target="#main"' in content
+        assert 'hx-push-url="true"' in content
+
+    def test_pagination_partial_renders_nothing_for_single_page(self):
+        """The partial itself must produce empty output for a 1-page queryset.
+
+        Guards against wasted UI noise when a small dataset is rendered.
+        """
+        from django.test import RequestFactory
+        from core.views import _paginate
+        from core.models import Resource
+
+        Resource.objects.bulk_create(
+            [Resource(name=f"single-{i}", resource_type="server") for i in range(5)]
+        )
+        request = RequestFactory().get("/resources/")
+        page_obj, paginator = _paginate(request, Resource.objects.all().order_by("name"))
+
+        from django.template.loader import render_to_string
+
+        html = render_to_string(
+            "core/_pagination.html",
+            {"page_obj": page_obj, "paginator": paginator, "page_url_name": "resource_list"},
+        )
+        assert html.strip() == ""
