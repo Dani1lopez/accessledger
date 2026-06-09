@@ -415,6 +415,12 @@ def user_update(request, pk):
             password = form.cleaned_data.get("password")
             if password:
                 user.set_password(password)
+                # Force the user to change this admin-set password on next login.
+                profile, _ = Profile.objects.get_or_create(
+                    user=user, defaults={"must_change_password": True}
+                )
+                profile.must_change_password = True
+                profile.save()
             user.save()
             log_action(
                 user=request.user,
