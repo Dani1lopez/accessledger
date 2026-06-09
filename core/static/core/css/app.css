@@ -1035,3 +1035,138 @@ select option {
     font-size: 13px;
   }
 }
+
+/* ===================================================================
+   PAGINATION — pill bar
+   ---------------------------------------------------------------------
+   The block intentionally has no entrance motion. HTMX swaps #main on
+   every page change, and a global lift-in keyframe would replay on
+   every swap and create visible flicker.
+   =================================================================== */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 18px 0 6px;
+  margin: 0;
+  color: var(--muted);
+}
+
+.pagination__link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+  text-decoration: none;
+  cursor: pointer;
+  user-select: none;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.pagination__link:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.04);
+  border-color: var(--line2);
+  transform: translateY(-1px);
+}
+
+.pagination__link:focus {
+  outline: none;
+}
+
+.pagination__link:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(110, 231, 255, 0.15);
+  border-color: rgba(110, 231, 255, 0.35);
+  color: var(--text);
+}
+
+.pagination__link--current {
+  background: linear-gradient(135deg, var(--accent), rgba(110, 231, 255, 0.8));
+  color: #080d12;
+  font-weight: 700;
+  border-color: transparent;
+  cursor: default;
+}
+
+.pagination__link--current:hover {
+  transform: none;
+  background: linear-gradient(135deg, var(--accent), rgba(110, 231, 255, 0.8));
+  color: #080d12;
+  border-color: transparent;
+}
+
+.pagination__link--disabled {
+  opacity: 0.4;
+  pointer-events: none;
+  cursor: default;
+}
+
+.pagination__link--disabled:hover {
+  transform: none;
+}
+
+.pagination__ellipsis {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 34px;
+  padding: 0 4px;
+  color: var(--muted);
+  font-size: 13px;
+  user-select: none;
+}
+
+/* Mobile meta — hidden by default, revealed on small viewports. */
+.pagination__meta {
+  display: none;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 0 8px;
+  user-select: none;
+}
+
+/* ===================================================================
+   RESPONSIVE — Pagination at ≤640px
+   ---------------------------------------------------------------------
+   Three flat @media blocks (not one nested block). Browsers merge
+   same-breakpoint blocks at cascade time, but the flat layout keeps
+   the rule set easy to scan and easy to introspect from tests.
+   =================================================================== */
+@media (max-width: 640px) {
+  .pagination__ellipsis { display: none; }
+}
+
+@media (max-width: 640px) {
+  .pagination__meta { display: inline-flex; align-items: center; }
+}
+
+@media (max-width: 640px) {
+  .pagination__link {
+    min-width: 36px;
+    height: 36px;
+    padding: 0 10px;
+    font-size: 12px;
+  }
+
+  /* Hide numeric pages — keep prev / next / disabled visible. */
+  .pagination__link:not(.pagination__link--prev):not(.pagination__link--next):not(.pagination__link--disabled) {
+    display: none;
+  }
+}
