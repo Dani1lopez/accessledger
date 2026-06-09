@@ -4,6 +4,7 @@ from django.contrib.auth.models import User, Group, Permission
 from core.models import Resource, AccessGrant, AuditLog, Profile
 from django.utils import timezone
 from datetime import timedelta
+import re
 
 
 @pytest.mark.django_db
@@ -1046,3 +1047,186 @@ class TestCustomPasswordChangeView:
         )
         assert response.status_code == 302
         assert response.url == "/resources/"
+
+
+# ════════════════════════════════════════════════════════════════════════════════
+# Pagination tests — feat/pagination
+# ════════════════════════════════════════════════════════════════════════════════
+#
+# These tests are written FIRST in strict TDD: the _paginate helper, the
+# _pagination.html partial, and the paginated view code do not exist yet.
+# Every test below MUST fail at this stage (RED gate).
+
+
+def _make_audit_logs(n: int, base_username: str = "actor") -> None:
+    """Bulk-create N audit log entries with predictable object_repr values."""
+    AuditLog.objects.bulk_create(
+        [
+            AuditLog(
+                user=None,
+                action="resource_created",
+                object_type="Resource",
+                object_id=i + 1,
+                object_repr=f"{base_username}-r{i + 1}",
+                before=None,
+                after={"name": f"{base_username}-r{i + 1}"},
+            )
+            for i in range(n)
+        ]
+    )
+
+
+def _audit_reprs_in(content: str) -> set[str]:
+    """Extract the set of audit-object-repr spans from an HTML response."""
+    return set(re.findall(r'audit-object-repr">([^<]+)<', content))
+
+
+def _pill_text(content: str) -> str:
+    """Extract the first ``<div class="pill">...</div>`` text from a response."""
+    m = re.search(r'<div class="pill"[^>]*>([^<]+)</div>', content)
+    assert m is not None, "Count pill not found in response"
+    return m.group(1).strip()
+
+
+@pytest.mark.django_db
+class TestPaginateHelper:
+    """Unit tests for the shared _paginate(request, qs) helper."""
+
+    def test_returns_page_obj_with_first_page_when_no_param(self):
+        from django.test import RequestFactory
+        from core.views import _paginate
+        from core.models import Resource
+
+        # 25 resources → expect 2 pages at PAGE_SIZE=20
+        Resource.objects.bulk_create(
+            [Resource(name=f"r{i}", resource_type="server") for i in range(25)]
+        )
+        request = RequestFactory().get("/resources/")
+        page_obj, paginator = _paginate(request, Resource.objects.all().order_by("name"))
+
+        assert paginator.count == 25
+        assert paginator.num_pages == 2
+        assert page_obj.number == 1
+        assert len(page_obj.object_list) == 20
+
+    def test_get_page_returns_last_page_for_out_of_range(self):
+        from django.test import RequestFactory
+        from core.views import _paginate
+        from core.models import Resource
+
+        Resource.objects.bulk_create(
+            [Resource(name=f"r{i}", resource_type="server") for i in range(25)]
+        )
+        request = RequestFactory().get("/resources/?page=999")
+        page_obj, paginator = _paginate(request, Resource.objects.all().order_by("name"))
+
+        # Out-of-range must fall back to the last valid page, not 404
+        assert page_obj.number == paginator.num_pages == 2
+        assert len(page_obj.object_list) == 5
+
+    def test_get_page_returns_first_page_for_non_integer(self):
+        from django.test import RequestFactory
+        from core.views import _paginate
+        from core.models import Resource
+
+        Resource.objects.bulk_create(
+            [Resource(name=f"r{i}", resource_type="server") for i in range(25)]
+        )
+        request = RequestFactory().get("/resources/?page=abc")
+        page_obj, paginator = _paginate(request, Resource.objects.all().order_by("name"))
+
+        # Non-integer must fall back to page 1
+        assert page_obj.number == 1
+
+
+@pytest.mark.django_db
+class TestAuditLogPagination:
+    """Integration tests for the paginated audit_log view.
+
+    Entries are ordered by ``-timestamp`` in the view. ``_make_audit_logs``
+    bulk-creates rows in id order (r1 oldest → r25 newest). With ``-timestamp``
+    ordering, r25 appears on page 1 and r1 appears on page 2.
+
+    Object reprs are matched on the ``<span class="mono audit-object-repr">``
+    boundary so substrings like "actor-r1" inside "actor-r10" do not match.
+    """
+
+    def test_audit_log_pagination_renders_only_one_page_of_rows(self, admin_client):
+        """When more than 20 entries exist, page 1 renders 20 rows, page 2 has the rest."""
+        _make_audit_logs(25)
+        response = admin_client.get("/audit_log/")
+        assert response.status_code == 200
+        reprs = _audit_reprs_in(response.content.decode())
+
+        # Page 1: newest 20 → r6..r25
+        for i in range(6, 26):
+            assert f"actor-r{i}" in reprs, f"actor-r{i} should appear on page 1"
+        # Page 1 must NOT contain the oldest 5 (r1..r5)
+        for i in range(1, 6):
+            assert f"actor-r{i}" not in reprs, f"actor-r{i} should NOT appear on page 1"
+
+    def test_audit_log_pagination_page_param_returns_correct_slice(self, admin_client):
+        """?page=2 returns the oldest 5 entries (r1..r5)."""
+        _make_audit_logs(25)
+        response = admin_client.get("/audit_log/?page=2")
+        assert response.status_code == 200
+        reprs = _audit_reprs_in(response.content.decode())
+
+        # Page 2: oldest 5 → r1..r5
+        for i in range(1, 6):
+            assert f"actor-r{i}" in reprs, f"actor-r{i} should appear on page 2"
+        # Newest entries must NOT be on page 2
+        assert "actor-r25" not in reprs
+
+    def test_audit_log_pagination_out_of_range_returns_last_page(self, admin_client):
+        """?page=999 falls back to the last valid page (no 404)."""
+        _make_audit_logs(25)
+        response = admin_client.get("/audit_log/?page=999")
+        assert response.status_code == 200
+        reprs = _audit_reprs_in(response.content.decode())
+
+        # Last page: oldest 5 → r1..r5 must be present
+        for i in range(1, 6):
+            assert f"actor-r{i}" in reprs
+
+    def test_audit_log_pagination_renders_pagination_partial(self, admin_client):
+        """The _pagination.html partial must be present in the response."""
+        _make_audit_logs(25)
+        response = admin_client.get("/audit_log/")
+        assert response.status_code == 200
+        content = response.content.decode()
+
+        # Pagination navigation must be present
+        assert 'class="pagination"' in content
+        # Must contain a link to page 2
+        assert "page=2" in content
+
+    def test_audit_log_pagination_count_pill_uses_paginator_count(self, admin_client):
+        """Count pill must show the total (25) on EVERY page, not the page size (20).
+
+        This is the regression that motivates using ``paginator.count`` over
+        ``|length``: on page 2 (5 rows), ``|length`` would falsely show 5.
+        """
+        _make_audit_logs(25)
+
+        # Page 1: pill must show 25 (total), not 20 (page size)
+        response = admin_client.get("/audit_log/")
+        assert _pill_text(response.content.decode()) == "25 registros"
+
+        # Page 2: pill must STILL show 25, not 5 (the page size of 5 rows)
+        response = admin_client.get("/audit_log/?page=2")
+        assert _pill_text(response.content.decode()) == "25 registros"
+
+    def test_audit_log_htmx_partial_includes_pagination(self, admin_client):
+        """HTMX request also returns the pagination partial so links survive swaps."""
+        _make_audit_logs(25)
+        response = admin_client.get("/audit_log/?page=2", HTTP_HX_REQUEST="true")
+        assert response.status_code == 200
+        content = response.content.decode()
+
+        # Partial response → no <html> wrapper
+        assert "<html" not in content
+        # Pagination controls must still be present in the partial
+        assert 'class="pagination"' in content
+        # Must contain a link to page 1
+        assert "page=1" in content
