@@ -5,7 +5,16 @@
   <link rel="stylesheet" href="{% static 'core/css/auth.css' %}">
 {% endblock %}
 
-{% block nav %}<span class="brand">AccessLedger</span>{% endblock %}
+{% block nav %}
+<header class="topbar">
+  <div class="container topbar__inner">
+    <div class="brand">
+      <span class="brand__dot" aria-hidden="true"></span>
+      <span class="brand__name">AccessLedger</span>
+    </div>
+  </div>
+</header>
+{% endblock %}
 
 {% block title %}Cuenta bloqueada · AccessLedger{% endblock %}
 

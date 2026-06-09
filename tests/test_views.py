@@ -928,14 +928,21 @@ class TestUserProfileView:
 
 @pytest.mark.django_db
 class TestPasswordChangeTemplates:
-    """Verify auth pages render without the full navigation topbar."""
+    """Verify auth pages render the topbar with the brand logo but no nav links."""
 
-    def test_password_change_page_has_no_topbar(self, forced_password_client):
-        """Password change page must NOT include the topbar header when forced."""
+    def test_password_change_page_has_topbar_with_logo_but_no_nav(self, forced_password_client):
+        """Password change page includes the topbar + brand logo but no navigation links."""
         response = forced_password_client.get("/password/change/")
         assert response.status_code == 200
         content = response.content.decode()
-        assert '<header class="topbar"' not in content
+        # Topbar with logo SHOULD be present.
+        assert '<header class="topbar"' in content
+        assert 'class="brand__dot"' in content
+        assert 'class="brand__name"' in content
+        # Navigation links SHOULD NOT be present on auth pages.
+        assert "<nav" not in content
+        assert "nav__link" not in content
+        assert 'action="/logout/"' not in content
 
     def test_password_change_page_has_no_logout_form(self, forced_password_client):
         """Password change page must NOT include a logout form."""
@@ -944,18 +951,30 @@ class TestPasswordChangeTemplates:
         content = response.content.decode()
         assert 'action="/logout/"' not in content
 
-    def test_login_page_has_no_topbar(self, client):
-        """Login page must NOT include the full nav topbar."""
+    def test_login_page_has_topbar_with_logo_but_no_nav(self, client):
+        """Login page includes the topbar + brand logo but no navigation links."""
         response = client.get("/login/")
         assert response.status_code == 200
         content = response.content.decode()
-        assert '<header class="topbar"' not in content
+        # Topbar with logo SHOULD be present.
+        assert '<header class="topbar"' in content
+        assert 'class="brand__dot"' in content
+        assert 'class="brand__name"' in content
+        # Navigation links SHOULD NOT be present on auth pages.
+        assert "<nav" not in content
+        assert "nav__link" not in content
 
-    def test_lockout_page_has_no_topbar(self):
-        """Lockout template must NOT include the full nav topbar (rendered by axes during lockout)."""
+    def test_lockout_page_has_topbar_with_logo_but_no_nav(self):
+        """Lockout template includes the topbar + brand logo but no navigation links."""
         from django.template.loader import render_to_string
         html = render_to_string("axes/lockout.html")
-        assert '<header class="topbar"' not in html
+        # Topbar with logo SHOULD be present.
+        assert '<header class="topbar"' in html
+        assert 'class="brand__dot"' in html
+        assert 'class="brand__name"' in html
+        # Navigation links SHOULD NOT be present on auth pages.
+        assert "<nav" not in html
+        assert "nav__link" not in html
 
     def test_resource_list_still_has_topbar(self, viewer_client):
         """Regression guard: authenticated pages with a resolved user still get the full topbar."""
