@@ -268,9 +268,16 @@ def user_list(request):
 class CustomPasswordChangeView(PasswordChangeView):
     success_url = reverse_lazy("resource_list")
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        from django.conf import settings
+        context["admin_email"] = settings.ADMIN_EMAIL
+        return context
+
     def form_valid(self, form):
         self.request.user.profile.must_change_password = False
         self.request.user.profile.save()
+        log_action(self.request.user, AuditLog.Action.PASSWORD_CHANGED, self.request.user)
         return super().form_valid(form)
 
 

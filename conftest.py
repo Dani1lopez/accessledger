@@ -21,6 +21,16 @@ def viewer_client(client):
     return client
 
 
+@pytest.fixture
+def forced_password_client(client):
+    """Authenticated user with must_change_password=True (forced redirect)."""
+    user = User.objects.create_user(username="forced1", password="ForcedPass123!")
+    # Profile auto-created via post_save with must_change_password=True (default)
+    assert user.profile.must_change_password is True
+    client.login(username="forced1", password="ForcedPass123!")
+    return client
+
+
 @pytest.fixture 
 def editor_client(client):
     group = Group.objects.create(name="editor")

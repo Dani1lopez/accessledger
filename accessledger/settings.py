@@ -163,6 +163,8 @@ LOGIN_URL = "/login/"
 LOGIN_REDIRECT_URL = "resource_list"
 LOGOUT_REDIRECT_URL = "/login/"
 
+ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@example.com")
+
 AXES_FAILURE_LIMIT = 5
 AXES_COOLOFF_TIME = 1
 AXES_LOCKOUT_CALLABLE = None

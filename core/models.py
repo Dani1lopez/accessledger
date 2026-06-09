@@ -84,6 +84,7 @@ class AuditLog(models.Model):
         USER_ACTIVATED = "user_activated", "User activated"
         USER_DEACTIVATED = "user_deactivated", "User deactivated"
         USER_UPDATED = "user_updated", "User updated"
+        PASSWORD_CHANGED = "password_changed", "Password changed"
     user = models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL, null=True)
     action = models.CharField(max_length=20, choices=Action.choices)
     object_type = models.CharField(max_length=20)
