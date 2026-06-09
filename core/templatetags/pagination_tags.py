@@ -54,3 +54,29 @@ def page_range_window(current, total):
         pages.append("...")
     pages.append(total)
     return pages
+
+
+@register.simple_tag(takes_context=True)
+def page_query(context, page_number):
+    """Build a query string for a pagination link.
+
+    Strips any existing ``page`` parameter from the current request and
+    appends ``page=<page_number>`` along with all other preserved params.
+    Returns a leading ``?`` (or empty string if there are no params).
+
+    Example
+    -------
+    With request ``/resources/?q=hello&page=2``::
+
+        {% page_query 3 as link %}
+        {# link == "?q=hello&page=3" #}
+    """
+    request = context.get("request")
+    if request is None:
+        return f"?page={page_number}"
+
+    params = request.GET.copy()
+    # Drop a pre-existing page param (QueryDict.pop is supported for removal).
+    params.pop("page", None)
+    params["page"] = str(page_number)
+    return "?" + params.urlencode()

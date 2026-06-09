@@ -1,0 +1,63 @@
+{# Reusable pagination controls. #}
+{# Expects in context: page_obj, paginator, request. #}
+{# Renders nothing if there is only one page (no nav needed). #}
+{# Preserves all current query string parameters when paging, except for #}
+{# the ``page`` key (which is replaced with the new page number).         #}
+{% load pagination_tags %}
+{% if paginator.num_pages > 1 %}
+  <nav class="pagination" aria-label="Paginación">
+    {# ── Prev ── #}
+    {% if page_obj.has_previous %}
+      {% page_query page_obj.previous_page_number as prev_url %}
+      <a class="pagination__link pagination__link--prev"
+         hx-get="{{ prev_url }}"
+         hx-target="#main"
+         hx-push-url="true"
+         aria-label="Página anterior"
+         href="{{ prev_url }}">‹ Anterior</a>
+    {% else %}
+      <span class="pagination__link pagination__link--prev pagination__link--disabled"
+            aria-disabled="true"
+            aria-label="Página anterior">‹ Anterior</span>
+    {% endif %}
+
+    {# ── Page numbers + ellipsis ── #}
+    {% for item in page_obj.number|page_range_window:paginator.num_pages %}
+      {% if item == "..." %}
+        <span class="pagination__ellipsis" aria-hidden="true">…</span>
+      {% elif item == page_obj.number %}
+        <span class="pagination__link pagination__link--current"
+              aria-current="page"
+              aria-label="Página {{ item }}">{{ item }}</span>
+      {% else %}
+        {% page_query item as item_url %}
+        <a class="pagination__link"
+           hx-get="{{ item_url }}"
+           hx-target="#main"
+           hx-push-url="true"
+           aria-label="Página {{ item }}"
+           href="{{ item_url }}">{{ item }}</a>
+      {% endif %}
+    {% endfor %}
+
+    {# ── Next ── #}
+    {% if page_obj.has_next %}
+      {% page_query page_obj.next_page_number as next_url %}
+      <a class="pagination__link pagination__link--next"
+         hx-get="{{ next_url }}"
+         hx-target="#main"
+         hx-push-url="true"
+         aria-label="Página siguiente"
+         href="{{ next_url }}">Siguiente ›</a>
+    {% else %}
+      <span class="pagination__link pagination__link--next pagination__link--disabled"
+            aria-disabled="true"
+            aria-label="Página siguiente">Siguiente ›</span>
+    {% endif %}
+
+    {# ── Mobile meta (visible only at ≤480px) ── #}
+    <span class="pagination__meta" aria-hidden="true">
+      Página {{ page_obj.number }} de {{ paginator.num_pages }}
+    </span>
+  </nav>
+{% endif %}
