@@ -29,7 +29,7 @@
   <div class="card__header">
     <div class="card__title">Usuarios</div>
     <div class="pill" id="countPill">
-      {{ users|length }} usuario{{ users|length|pluralize:"s" }}
+      {{ paginator.count }} usuario{{ paginator.count|pluralize:"s" }}
     </div>
   </div>
 
@@ -46,7 +46,7 @@
         </tr>
       </thead>
       <tbody>
-        {% for u in users %}
+        {% for u in page_obj %}
         <tr class="row">
           <td class="mono">@{{ u.username }}</td>
           <td>{{ u.email|default:"—" }}</td>
@@ -110,6 +110,9 @@
     </table>
   </div>
 </section>
+
+{% include "core/_pagination.html" with page_url_name=page_url_name %}
+
 <!-- Modal crear usuario -->
 <dialog id="modalCreateUser">
   <div class="modal__header">

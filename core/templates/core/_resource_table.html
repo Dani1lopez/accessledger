@@ -35,7 +35,7 @@
         </tr>
       </thead>
       <tbody>
-        {% for r in resources %}
+        {% for r in page_obj %}
           <tr class="row row--link" onclick="location.href='{% url 'resource_detail' r.pk %}'">
             <td class="mono">{{ r.name }}</td>
             <td><span class="badge">{{ r.get_resource_type_display }}</span></td>
@@ -53,6 +53,8 @@
     </table>
   </div>
 </section>
+
+{% include "core/_pagination.html" with page_url_name=page_url_name %}
 
 
 {# ── Modal: Nuevo recurso ── #}
