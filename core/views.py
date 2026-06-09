@@ -314,7 +314,8 @@ def user_profile(request):
 @login_required
 @admin_required
 def user_management(request):
-    users = User.objects.all().prefetch_related("groups")
+    users = User.objects.all().prefetch_related("groups").order_by("id")
+    page_obj, paginator = _paginate(request, users)
     groups = Group.objects.all()
     if request.htmx:
         template = "core/_user_management.html"
@@ -324,8 +325,10 @@ def user_management(request):
         request,
         template,
         {
-            "users": users,
+            "page_obj": page_obj,
+            "paginator": paginator,
             "groups": groups,
+            "page_url_name": "user_management",
         },
     )
 

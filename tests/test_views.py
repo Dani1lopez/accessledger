@@ -1230,3 +1230,119 @@ class TestAuditLogPagination:
         assert 'class="pagination"' in content
         # Must contain a link to page 1
         assert "page=1" in content
+
+
+@pytest.mark.django_db
+class TestUserManagementPagination:
+    """Integration tests for the paginated user_management view.
+
+    ``_make_users`` creates 25 users (u1..u25) created in sequence; the view
+    returns them in default User ordering (by id, ascending) so u1..u20 are
+    on page 1 and u21..u25 are on page 2.
+    """
+
+    @staticmethod
+    def _make_users(n: int) -> None:
+        User.objects.bulk_create(
+            [User(username=f"user-pg-{i:02d}", email=f"u{i}@x.com") for i in range(1, n + 1)]
+        )
+
+    @staticmethod
+    def _usernames_in(content: str) -> set[str]:
+        return set(re.findall(r'@user-pg-\d+', content))
+
+    def test_user_management_pagination_renders_only_one_page_of_rows(self, admin_client):
+        """When more than 20 users exist, page 1 renders 20 rows, page 2 has the rest.
+
+        The ``admin_client`` fixture creates an ``admin1`` user, so the user
+        table already has 1 row before ``_make_users`` runs (25 → 26 total).
+        """
+        self._make_users(25)
+        response = admin_client.get("/users/manage/")
+        assert response.status_code == 200
+        usernames = self._usernames_in(response.content.decode())
+
+        # Page 1 has 20 rows total. Of the 25 created, 19 should appear on
+        # page 1 (the oldest 19: user-pg-01..user-pg-19) because admin1 takes
+        # the 1 remaining slot.
+        for i in range(1, 20):
+            assert f"@user-pg-{i:02d}" in usernames, f"user-pg-{i:02d} should appear on page 1"
+        # user-pg-20 and later must NOT be on page 1
+        for i in range(20, 26):
+            assert (
+                f"@user-pg-{i:02d}" not in usernames
+            ), f"user-pg-{i:02d} should NOT appear on page 1"
+
+    def test_user_management_pagination_page_param_returns_correct_slice(self, admin_client):
+        """?page=2 returns the remaining 6 users (25 created + 1 admin1)."""
+        self._make_users(25)
+        response = admin_client.get("/users/manage/?page=2")
+        assert response.status_code == 200
+        usernames = self._usernames_in(response.content.decode())
+
+        # Page 2 holds the 6 newest users
+        for i in range(20, 26):
+            assert f"@user-pg-{i:02d}" in usernames, f"user-pg-{i:02d} should appear on page 2"
+        # user-pg-01 must NOT be on page 2
+        assert "@user-pg-01" not in usernames
+
+    def test_user_management_pagination_out_of_range_returns_last_page(self, admin_client):
+        """?page=999 falls back to the last valid page (no 404)."""
+        self._make_users(25)
+        response = admin_client.get("/users/manage/?page=999")
+        assert response.status_code == 200
+        usernames = self._usernames_in(response.content.decode())
+
+        # Last page: user-pg-20..user-pg-25 must be present
+        for i in range(20, 26):
+            assert f"@user-pg-{i:02d}" in usernames
+
+    def test_user_management_pagination_count_pill_uses_paginator_count(self, admin_client):
+        """Count pill must show the total (26) on every page, not the page size.
+
+        The ``admin_client`` fixture creates admin1, so the total is
+        25 (created) + 1 (admin1) = 26 users. With PAGE_SIZE=20, page 1
+        has 20 rows and page 2 has 6. The pill must show 26 on both.
+        """
+        self._make_users(25)
+
+        # Page 1
+        response = admin_client.get("/users/manage/")
+        assert _pill_text(response.content.decode()) == "26 usuarios"
+
+        # Page 2 — pill must STILL show 26, not 6 (the page size of 6 rows)
+        response = admin_client.get("/users/manage/?page=2")
+        assert _pill_text(response.content.decode()) == "26 usuarios"
+
+    def test_user_management_pagination_renders_pagination_partial(self, admin_client):
+        """The _pagination.html partial must be present in the response."""
+        self._make_users(25)
+        response = admin_client.get("/users/manage/")
+        assert response.status_code == 200
+        content = response.content.decode()
+
+        assert 'class="pagination"' in content
+        # Must contain a link to page 2
+        assert "page=2" in content
+
+    def test_user_management_pagination_preserves_modals(self, admin_client):
+        """Pagination swap must NOT strip the modals from the partial.
+
+        Modals live in the partial so the user can still open them after
+        clicking a pagination link.
+        """
+        self._make_users(25)
+        response = admin_client.get(
+            "/users/manage/?page=2", HTTP_HX_REQUEST="true"
+        )
+        assert response.status_code == 200
+        content = response.content.decode()
+
+        # Partial response → no <html> wrapper
+        assert "<html" not in content
+        # Create-user modal must still be present
+        assert 'id="modalCreateUser"' in content
+        # Edit-user modal must still be present
+        assert 'id="modalEditUser"' in content
+        # Pagination must also be present
+        assert 'class="pagination"' in content
