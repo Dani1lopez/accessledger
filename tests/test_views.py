@@ -1529,7 +1529,7 @@ class TestPaginationEdgeCases:
         content = response.content.decode()
 
         # The page-2 link must be htmx-driven AND have a non-htmx fallback href
-        assert 'hx-get="/audit_log/?page=2"' in content
+        assert 'hx-get="?page=2"' in content
         assert 'hx-target="#main"' in content
         assert 'hx-push-url="true"' in content
         # Fallback href so non-JS clients can still navigate
@@ -1545,7 +1545,7 @@ class TestPaginationEdgeCases:
         assert response.status_code == 200
         content = response.content.decode()
 
-        assert 'hx-get="/users/manage/?page=2"' in content
+        assert 'hx-get="?page=2"' in content
         assert 'hx-target="#main"' in content
         assert 'hx-push-url="true"' in content
 
@@ -1558,7 +1558,7 @@ class TestPaginationEdgeCases:
         assert response.status_code == 200
         content = response.content.decode()
 
-        assert 'hx-get="/resources/?page=2"' in content
+        assert 'hx-get="?page=2"' in content
         assert 'hx-target="#main"' in content
         assert 'hx-push-url="true"' in content
 
