@@ -800,6 +800,89 @@ class TestUserUpdateView:
         profile = Profile.objects.get(user=target)
         assert profile.must_change_password is True
 
+    def test_admin_password_update_forces_change_on_next_login(self, admin_client):
+        """REQ-3 full flow: admin updates password → user logs in with new password
+        → middleware redirects to /password/change/.
+
+        Bug regression: previously, ``user_update`` rotated the password but
+        did not set ``must_change_password=True``, so the user could log in
+        with the new password and bypass the forced-change flow entirely.
+        """
+        group = Group.objects.create(name="viewer")
+        target = User.objects.create_user(username="targetuser", password="oldpass")
+        target.profile.must_change_password = False
+        target.profile.save()
+        target.groups.add(group)
+
+        # 1. Admin updates the target's password.
+        response = admin_client.post(
+            f"/users/{target.pk}/edit/",
+            data={
+                "username": "targetuser",
+                "email": "target@test.com",
+                "first_name": "Target",
+                "last_name": "User",
+                "role": group.pk,
+                "password": "newpass123",
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        assert response.status_code == 200
+        assert response.json()["success"] is True
+
+        # 2. Target user logs in with the NEW password.
+        admin_client.logout()
+        login_ok = admin_client.login(username="targetuser", password="newpass123")
+        assert login_ok is True, "Target user should be able to log in with the new password"
+
+        # 3. Target requests a protected URL — middleware must redirect.
+        response = admin_client.get("/resources/")
+        assert response.status_code == 302
+        assert response.url == "/password/change/"
+
+    def test_empty_password_field_preserves_existing_password(self, admin_client):
+        """REQ-2: explicit empty password field MUST NOT overwrite the user's password.
+
+        The form may submit ``password=""`` (empty string, not omitted) when the
+        admin leaves the field blank. The view must skip the password update
+        branch entirely so the target can still log in with the previous password.
+        """
+        group = Group.objects.create(name="viewer")
+        target = User.objects.create_user(username="targetuser", password="oldpass")
+        target.profile.must_change_password = False
+        target.profile.save()
+        target.groups.add(group)
+
+        # Admin submits update form with EXPLICIT empty password.
+        response = admin_client.post(
+            f"/users/{target.pk}/edit/",
+            data={
+                "username": "targetuser",
+                "email": "target@test.com",
+                "first_name": "Target",
+                "last_name": "User",
+                "role": group.pk,
+                "password": "",  # explicit empty string
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        assert response.status_code == 200
+        assert response.json()["success"] is True
+
+        # The previous password must still work — proves no overwrite happened.
+        target.refresh_from_db()
+        assert target.check_password("oldpass") is True
+        assert target.check_password("") is False
+
+        # Flag must remain False — we did not rotate the password.
+        target.profile.refresh_from_db()
+        assert target.profile.must_change_password is False
+
+        # And the user can still log in with the old password.
+        admin_client.logout()
+        login_ok = admin_client.login(username="targetuser", password="oldpass")
+        assert login_ok is True, "User should still be able to log in with old password"
+
 
 @pytest.mark.django_db
 class TestUserProfileView:
