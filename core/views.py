@@ -1,6 +1,7 @@
 from django.shortcuts import redirect, render, get_object_or_404
 from django.contrib.auth.decorators import permission_required, login_required
 from django.core.exceptions import PermissionDenied
+from django.core.paginator import Paginator
 from django.http import JsonResponse, HttpResponseNotAllowed
 from core.decorators import admin_required
 from core.forms import AccessGrantForm, ResourceForm, UserForm, UserCreateForm
@@ -11,11 +12,25 @@ from django.contrib.auth.views import PasswordChangeView
 from django.urls import reverse_lazy
 from .utils import log_action
 
+PAGE_SIZE = 20
+
+
+def _paginate(request, qs):
+    """Wrap a queryset in a Paginator and return (page_obj, paginator).
+
+    Uses ``paginator.get_page()`` so out-of-range and non-integer ``?page=``
+    values fall back to the last valid page (or page 1) without 404s.
+    """
+    paginator = Paginator(qs, PAGE_SIZE)
+    page_obj = paginator.get_page(request.GET.get("page"))
+    return page_obj, paginator
+
 
 @login_required
 @permission_required("core.view_resource", raise_exception=True)
 def resource_list(request):
     resources = Resource.objects.all().order_by("name")
+    page_obj, paginator = _paginate(request, resources)
     if request.htmx:
         template = "core/_resource_table.html"
     else:
@@ -23,7 +38,12 @@ def resource_list(request):
     return render(
         request,
         template,
-        {"resources": resources, "form": ResourceForm()},
+        {
+            "page_obj": page_obj,
+            "paginator": paginator,
+            "form": ResourceForm(),
+            "page_url_name": "resource_list",
+        },
     )
 
 
@@ -300,7 +320,8 @@ def user_profile(request):
 @login_required
 @admin_required
 def user_management(request):
-    users = User.objects.all().prefetch_related("groups")
+    users = User.objects.all().prefetch_related("groups").order_by("id")
+    page_obj, paginator = _paginate(request, users)
     groups = Group.objects.all()
     if request.htmx:
         template = "core/_user_management.html"
@@ -310,8 +331,10 @@ def user_management(request):
         request,
         template,
         {
-            "users": users,
+            "page_obj": page_obj,
+            "paginator": paginator,
             "groups": groups,
+            "page_url_name": "user_management",
         },
     )
 
@@ -448,6 +471,7 @@ def user_update(request, pk):
 @admin_required
 def audit_log(request):
     audit = AuditLog.objects.all().order_by("-timestamp").select_related("user")
+    page_obj, paginator = _paginate(request, audit)
     if request.htmx:
         template = "core/_audit_log.html"
     else:
@@ -456,6 +480,8 @@ def audit_log(request):
         request,
         template,
         {
-            "audit": audit,
+            "page_obj": page_obj,
+            "paginator": paginator,
+            "page_url_name": "audit_log",
         },
     )

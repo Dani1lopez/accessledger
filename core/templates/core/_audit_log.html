@@ -8,7 +8,7 @@
 <section class="card lift-in">
   <div class="card__header">
     <div class="card__title">Actividad</div>
-    <div class="pill">{{ audit|length }} registro{{ audit|length|pluralize:"s" }}</div>
+    <div class="pill">{{ paginator.count }} registro{{ paginator.count|pluralize:"s" }}</div>
   </div>
 
   <div class="table-wrap">
@@ -23,7 +23,7 @@
         </tr>
       </thead>
       <tbody>
-        {% for entry in audit %}
+        {% for entry in page_obj %}
           <tr class="row">
             <td class="mono audit-timestamp">
               {{ entry.timestamp|date:"d/m/Y H:i" }}
@@ -66,6 +66,8 @@
     </table>
   </div>
 </section>
+
+{% include "core/_pagination.html" with page_url_name=page_url_name %}
 
 {# ── Modal: Detalle de entrada ── #}
 <dialog id="modalAuditDetail">

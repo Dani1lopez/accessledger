@@ -4,6 +4,7 @@ from django.contrib.auth.models import User, Group, Permission
 from core.models import Resource, AccessGrant, AuditLog, Profile
 from django.utils import timezone
 from datetime import timedelta
+import re
 
 
 @pytest.mark.django_db
@@ -1046,3 +1047,540 @@ class TestCustomPasswordChangeView:
         )
         assert response.status_code == 302
         assert response.url == "/resources/"
+
+
+# ════════════════════════════════════════════════════════════════════════════════
+# Pagination tests — feat/pagination
+# ════════════════════════════════════════════════════════════════════════════════
+#
+# These tests are written FIRST in strict TDD: the _paginate helper, the
+# _pagination.html partial, and the paginated view code do not exist yet.
+# Every test below MUST fail at this stage (RED gate).
+
+
+def _make_audit_logs(n: int, base_username: str = "actor") -> None:
+    """Bulk-create N audit log entries with predictable object_repr values."""
+    AuditLog.objects.bulk_create(
+        [
+            AuditLog(
+                user=None,
+                action="resource_created",
+                object_type="Resource",
+                object_id=i + 1,
+                object_repr=f"{base_username}-r{i + 1}",
+                before=None,
+                after={"name": f"{base_username}-r{i + 1}"},
+            )
+            for i in range(n)
+        ]
+    )
+
+
+def _audit_reprs_in(content: str) -> set[str]:
+    """Extract the set of audit-object-repr spans from an HTML response."""
+    return set(re.findall(r'audit-object-repr">([^<]+)<', content))
+
+
+def _pill_text(content: str) -> str:
+    """Extract the first ``<div class="pill">...</div>`` text from a response."""
+    m = re.search(r'<div class="pill"[^>]*>([^<]+)</div>', content)
+    assert m is not None, "Count pill not found in response"
+    return m.group(1).strip()
+
+
+@pytest.mark.django_db
+class TestPaginateHelper:
+    """Unit tests for the shared _paginate(request, qs) helper."""
+
+    def test_returns_page_obj_with_first_page_when_no_param(self):
+        from django.test import RequestFactory
+        from core.views import _paginate
+        from core.models import Resource
+
+        # 25 resources → expect 2 pages at PAGE_SIZE=20
+        Resource.objects.bulk_create(
+            [Resource(name=f"r{i}", resource_type="server") for i in range(25)]
+        )
+        request = RequestFactory().get("/resources/")
+        page_obj, paginator = _paginate(request, Resource.objects.all().order_by("name"))
+
+        assert paginator.count == 25
+        assert paginator.num_pages == 2
+        assert page_obj.number == 1
+        assert len(page_obj.object_list) == 20
+
+    def test_get_page_returns_last_page_for_out_of_range(self):
+        from django.test import RequestFactory
+        from core.views import _paginate
+        from core.models import Resource
+
+        Resource.objects.bulk_create(
+            [Resource(name=f"r{i}", resource_type="server") for i in range(25)]
+        )
+        request = RequestFactory().get("/resources/?page=999")
+        page_obj, paginator = _paginate(request, Resource.objects.all().order_by("name"))
+
+        # Out-of-range must fall back to the last valid page, not 404
+        assert page_obj.number == paginator.num_pages == 2
+        assert len(page_obj.object_list) == 5
+
+    def test_get_page_returns_first_page_for_non_integer(self):
+        from django.test import RequestFactory
+        from core.views import _paginate
+        from core.models import Resource
+
+        Resource.objects.bulk_create(
+            [Resource(name=f"r{i}", resource_type="server") for i in range(25)]
+        )
+        request = RequestFactory().get("/resources/?page=abc")
+        page_obj, paginator = _paginate(request, Resource.objects.all().order_by("name"))
+
+        # Non-integer must fall back to page 1
+        assert page_obj.number == 1
+
+
+@pytest.mark.django_db
+class TestAuditLogPagination:
+    """Integration tests for the paginated audit_log view.
+
+    Entries are ordered by ``-timestamp`` in the view. ``_make_audit_logs``
+    bulk-creates rows in id order (r1 oldest → r25 newest). With ``-timestamp``
+    ordering, r25 appears on page 1 and r1 appears on page 2.
+
+    Object reprs are matched on the ``<span class="mono audit-object-repr">``
+    boundary so substrings like "actor-r1" inside "actor-r10" do not match.
+    """
+
+    def test_audit_log_pagination_renders_only_one_page_of_rows(self, admin_client):
+        """When more than 20 entries exist, page 1 renders 20 rows, page 2 has the rest."""
+        _make_audit_logs(25)
+        response = admin_client.get("/audit_log/")
+        assert response.status_code == 200
+        reprs = _audit_reprs_in(response.content.decode())
+
+        # Page 1: newest 20 → r6..r25
+        for i in range(6, 26):
+            assert f"actor-r{i}" in reprs, f"actor-r{i} should appear on page 1"
+        # Page 1 must NOT contain the oldest 5 (r1..r5)
+        for i in range(1, 6):
+            assert f"actor-r{i}" not in reprs, f"actor-r{i} should NOT appear on page 1"
+
+    def test_audit_log_pagination_page_param_returns_correct_slice(self, admin_client):
+        """?page=2 returns the oldest 5 entries (r1..r5)."""
+        _make_audit_logs(25)
+        response = admin_client.get("/audit_log/?page=2")
+        assert response.status_code == 200
+        reprs = _audit_reprs_in(response.content.decode())
+
+        # Page 2: oldest 5 → r1..r5
+        for i in range(1, 6):
+            assert f"actor-r{i}" in reprs, f"actor-r{i} should appear on page 2"
+        # Newest entries must NOT be on page 2
+        assert "actor-r25" not in reprs
+
+    def test_audit_log_pagination_out_of_range_returns_last_page(self, admin_client):
+        """?page=999 falls back to the last valid page (no 404)."""
+        _make_audit_logs(25)
+        response = admin_client.get("/audit_log/?page=999")
+        assert response.status_code == 200
+        reprs = _audit_reprs_in(response.content.decode())
+
+        # Last page: oldest 5 → r1..r5 must be present
+        for i in range(1, 6):
+            assert f"actor-r{i}" in reprs
+
+    def test_audit_log_pagination_renders_pagination_partial(self, admin_client):
+        """The _pagination.html partial must be present in the response."""
+        _make_audit_logs(25)
+        response = admin_client.get("/audit_log/")
+        assert response.status_code == 200
+        content = response.content.decode()
+
+        # Pagination navigation must be present
+        assert 'class="pagination"' in content
+        # Must contain a link to page 2
+        assert "page=2" in content
+
+    def test_audit_log_pagination_count_pill_uses_paginator_count(self, admin_client):
+        """Count pill must show the total (25) on EVERY page, not the page size (20).
+
+        This is the regression that motivates using ``paginator.count`` over
+        ``|length``: on page 2 (5 rows), ``|length`` would falsely show 5.
+        """
+        _make_audit_logs(25)
+
+        # Page 1: pill must show 25 (total), not 20 (page size)
+        response = admin_client.get("/audit_log/")
+        assert _pill_text(response.content.decode()) == "25 registros"
+
+        # Page 2: pill must STILL show 25, not 5 (the page size of 5 rows)
+        response = admin_client.get("/audit_log/?page=2")
+        assert _pill_text(response.content.decode()) == "25 registros"
+
+    def test_audit_log_htmx_partial_includes_pagination(self, admin_client):
+        """HTMX request also returns the pagination partial so links survive swaps."""
+        _make_audit_logs(25)
+        response = admin_client.get("/audit_log/?page=2", HTTP_HX_REQUEST="true")
+        assert response.status_code == 200
+        content = response.content.decode()
+
+        # Partial response → no <html> wrapper
+        assert "<html" not in content
+        # Pagination controls must still be present in the partial
+        assert 'class="pagination"' in content
+        # Must contain a link to page 1
+        assert "page=1" in content
+
+
+@pytest.mark.django_db
+class TestUserManagementPagination:
+    """Integration tests for the paginated user_management view.
+
+    ``_make_users`` creates 25 users (u1..u25) created in sequence; the view
+    returns them in default User ordering (by id, ascending) so u1..u20 are
+    on page 1 and u21..u25 are on page 2.
+    """
+
+    @staticmethod
+    def _make_users(n: int) -> None:
+        User.objects.bulk_create(
+            [User(username=f"user-pg-{i:02d}", email=f"u{i}@x.com") for i in range(1, n + 1)]
+        )
+
+    @staticmethod
+    def _usernames_in(content: str) -> set[str]:
+        return set(re.findall(r'@user-pg-\d+', content))
+
+    def test_user_management_pagination_renders_only_one_page_of_rows(self, admin_client):
+        """When more than 20 users exist, page 1 renders 20 rows, page 2 has the rest.
+
+        The ``admin_client`` fixture creates an ``admin1`` user, so the user
+        table already has 1 row before ``_make_users`` runs (25 → 26 total).
+        """
+        self._make_users(25)
+        response = admin_client.get("/users/manage/")
+        assert response.status_code == 200
+        usernames = self._usernames_in(response.content.decode())
+
+        # Page 1 has 20 rows total. Of the 25 created, 19 should appear on
+        # page 1 (the oldest 19: user-pg-01..user-pg-19) because admin1 takes
+        # the 1 remaining slot.
+        for i in range(1, 20):
+            assert f"@user-pg-{i:02d}" in usernames, f"user-pg-{i:02d} should appear on page 1"
+        # user-pg-20 and later must NOT be on page 1
+        for i in range(20, 26):
+            assert (
+                f"@user-pg-{i:02d}" not in usernames
+            ), f"user-pg-{i:02d} should NOT appear on page 1"
+
+    def test_user_management_pagination_page_param_returns_correct_slice(self, admin_client):
+        """?page=2 returns the remaining 6 users (25 created + 1 admin1)."""
+        self._make_users(25)
+        response = admin_client.get("/users/manage/?page=2")
+        assert response.status_code == 200
+        usernames = self._usernames_in(response.content.decode())
+
+        # Page 2 holds the 6 newest users
+        for i in range(20, 26):
+            assert f"@user-pg-{i:02d}" in usernames, f"user-pg-{i:02d} should appear on page 2"
+        # user-pg-01 must NOT be on page 2
+        assert "@user-pg-01" not in usernames
+
+    def test_user_management_pagination_out_of_range_returns_last_page(self, admin_client):
+        """?page=999 falls back to the last valid page (no 404)."""
+        self._make_users(25)
+        response = admin_client.get("/users/manage/?page=999")
+        assert response.status_code == 200
+        usernames = self._usernames_in(response.content.decode())
+
+        # Last page: user-pg-20..user-pg-25 must be present
+        for i in range(20, 26):
+            assert f"@user-pg-{i:02d}" in usernames
+
+    def test_user_management_pagination_count_pill_uses_paginator_count(self, admin_client):
+        """Count pill must show the total (26) on every page, not the page size.
+
+        The ``admin_client`` fixture creates admin1, so the total is
+        25 (created) + 1 (admin1) = 26 users. With PAGE_SIZE=20, page 1
+        has 20 rows and page 2 has 6. The pill must show 26 on both.
+        """
+        self._make_users(25)
+
+        # Page 1
+        response = admin_client.get("/users/manage/")
+        assert _pill_text(response.content.decode()) == "26 usuarios"
+
+        # Page 2 — pill must STILL show 26, not 6 (the page size of 6 rows)
+        response = admin_client.get("/users/manage/?page=2")
+        assert _pill_text(response.content.decode()) == "26 usuarios"
+
+    def test_user_management_pagination_renders_pagination_partial(self, admin_client):
+        """The _pagination.html partial must be present in the response."""
+        self._make_users(25)
+        response = admin_client.get("/users/manage/")
+        assert response.status_code == 200
+        content = response.content.decode()
+
+        assert 'class="pagination"' in content
+        # Must contain a link to page 2
+        assert "page=2" in content
+
+    def test_user_management_pagination_preserves_modals(self, admin_client):
+        """Pagination swap must NOT strip the modals from the partial.
+
+        Modals live in the partial so the user can still open them after
+        clicking a pagination link.
+        """
+        self._make_users(25)
+        response = admin_client.get(
+            "/users/manage/?page=2", HTTP_HX_REQUEST="true"
+        )
+        assert response.status_code == 200
+        content = response.content.decode()
+
+        # Partial response → no <html> wrapper
+        assert "<html" not in content
+        # Create-user modal must still be present
+        assert 'id="modalCreateUser"' in content
+        # Edit-user modal must still be present
+        assert 'id="modalEditUser"' in content
+        # Pagination must also be present
+        assert 'class="pagination"' in content
+
+
+@pytest.mark.django_db
+class TestResourceListPagination:
+    """Integration tests for the paginated resource_list view."""
+
+    @staticmethod
+    def _make_resources(n: int) -> None:
+        Resource.objects.bulk_create(
+            [Resource(name=f"r-pg-{i:02d}", resource_type="server") for i in range(1, n + 1)]
+        )
+
+    @staticmethod
+    def _resource_names_in(content: str) -> set[str]:
+        return set(re.findall(r'r-pg-\d+', content))
+
+    def test_resource_list_pagination_renders_only_one_page_of_rows(self, viewer_client):
+        """When more than 20 resources exist, page 1 renders 20 rows."""
+        self._make_resources(25)
+        response = viewer_client.get("/resources/")
+        assert response.status_code == 200
+        names = self._resource_names_in(response.content.decode())
+
+        # Page 1: r-pg-01..r-pg-20
+        for i in range(1, 21):
+            assert f"r-pg-{i:02d}" in names, f"r-pg-{i:02d} should appear on page 1"
+        # r-pg-21..r-pg-25 must NOT be on page 1
+        for i in range(21, 26):
+            assert f"r-pg-{i:02d}" not in names, f"r-pg-{i:02d} should NOT appear on page 1"
+
+    def test_resource_list_pagination_page_param_returns_correct_slice(self, viewer_client):
+        """?page=2 returns the remaining 5 resources."""
+        self._make_resources(25)
+        response = viewer_client.get("/resources/?page=2")
+        assert response.status_code == 200
+        names = self._resource_names_in(response.content.decode())
+
+        for i in range(21, 26):
+            assert f"r-pg-{i:02d}" in names, f"r-pg-{i:02d} should appear on page 2"
+        # r-pg-01 must NOT be on page 2
+        assert "r-pg-01" not in names
+
+    def test_resource_list_pagination_out_of_range_returns_last_page(self, viewer_client):
+        """?page=999 falls back to the last valid page (no 404)."""
+        self._make_resources(25)
+        response = viewer_client.get("/resources/?page=999")
+        assert response.status_code == 200
+        names = self._resource_names_in(response.content.decode())
+
+        # Last page: r-pg-21..r-pg-25
+        for i in range(21, 26):
+            assert f"r-pg-{i:02d}" in names
+
+    def test_resource_list_pagination_renders_pagination_partial(self, viewer_client):
+        """The _pagination.html partial must be present in the response."""
+        self._make_resources(25)
+        response = viewer_client.get("/resources/")
+        assert response.status_code == 200
+        content = response.content.decode()
+
+        assert 'class="pagination"' in content
+        assert "page=2" in content
+
+    def test_resource_list_pagination_iterates_page_obj(self, viewer_client):
+        """Template iterates page_obj (not 'resources') so pagination works."""
+        self._make_resources(25)
+        response = viewer_client.get("/resources/?page=2")
+        assert response.status_code == 200
+        names = self._resource_names_in(response.content.decode())
+
+        # r-pg-25 is alphabetically last → on page 2
+        assert "r-pg-25" in names
+        # r-pg-01 is alphabetically first → on page 1
+        assert "r-pg-01" not in names
+
+    def test_resource_list_htmx_partial_preserves_modal(self, viewer_client):
+        """HTMX partial for resources keeps the new-resource modal after pagination."""
+        # viewer cannot create, so we need a user with add_resource perm
+        # to verify the modal renders. Use editor_client instead.
+        from django.contrib.auth.models import User, Group, Permission
+        from django.test import Client
+
+        add_perm = Permission.objects.get(codename="add_resource")
+        view_perm = Permission.objects.get(codename="view_resource")
+        group = Group.objects.create(name="resource-pg-editor")
+        group.permissions.add(view_perm)
+        group.permissions.add(add_perm)
+        user = User.objects.create_user(username="rpg-editor", password="pass")
+        user.profile.must_change_password = False
+        user.profile.save()
+        user.groups.add(group)
+        client = Client()
+        client.login(username="rpg-editor", password="pass")
+
+        self._make_resources(25)
+        response = client.get("/resources/?page=2", HTTP_HX_REQUEST="true")
+        assert response.status_code == 200
+        content = response.content.decode()
+
+        # Partial response
+        assert "<html" not in content
+        # Modal must survive
+        assert 'id="modalNewResource"' in content
+        # Pagination must also be present
+        assert 'class="pagination"' in content
+
+
+@pytest.mark.django_db
+class TestPaginationEdgeCases:
+    """Edge cases for the shared pagination contract across all 3 views."""
+
+    def test_audit_log_empty_queryset_shows_zero_in_pill(self, admin_client):
+        """Empty queryset: count pill says '0 registros' and pagination is hidden."""
+        response = admin_client.get("/audit_log/")
+        assert response.status_code == 200
+        content = response.content.decode()
+
+        assert _pill_text(content) == "0 registros"
+        # No pagination nav when there's only one (empty) page
+        assert 'class="pagination"' not in content
+
+    def test_audit_log_single_page_hides_pagination(self, admin_client):
+        """Fewer than PAGE_SIZE entries: no pagination controls rendered."""
+        _make_audit_logs(5)
+        response = admin_client.get("/audit_log/")
+        assert response.status_code == 200
+        content = response.content.decode()
+
+        # All 5 fit on one page → no nav
+        assert 'class="pagination"' not in content
+        # Pill still shows the correct total
+        assert _pill_text(content) == "5 registros"
+
+    def test_user_management_empty_queryset_pill_is_zero(self, admin_client):
+        """Empty user table: pill is '0 usuarios' (singular, no pluralize branch)."""
+        # admin_client has admin1 user so it's never truly empty here.
+        # Verify the pill reflects the total (1 user) correctly.
+        response = admin_client.get("/users/manage/")
+        assert response.status_code == 200
+        content = response.content.decode()
+        # Just admin1 in this fresh DB
+        assert "1 usuario" in content
+        # No pagination needed for a single user
+        assert 'class="pagination"' not in content
+
+    def test_user_management_single_page_hides_pagination(self, admin_client):
+        """Fewer than PAGE_SIZE users: no pagination controls rendered."""
+        # admin_client has admin1 already. Add 4 more → 5 total, single page.
+        User.objects.bulk_create(
+            [User(username=f"single-pg-{i}", email=f"spg{i}@x.com") for i in range(1, 5)]
+        )
+        response = admin_client.get("/users/manage/")
+        assert response.status_code == 200
+        content = response.content.decode()
+        # 5 users, 1 page → no nav
+        assert 'class="pagination"' not in content
+
+    def test_resource_list_empty_queryset_no_pagination(self, viewer_client):
+        """No resources: pagination is hidden (no nav to render)."""
+        response = viewer_client.get("/resources/")
+        assert response.status_code == 200
+        content = response.content.decode()
+        assert 'class="pagination"' not in content
+
+    def test_resource_list_exactly_one_page_hides_pagination(self, viewer_client):
+        """Exactly PAGE_SIZE entries: no pagination controls needed."""
+        Resource.objects.bulk_create(
+            [Resource(name=f"exact-pg-{i:02d}", resource_type="server") for i in range(1, 21)]
+        )
+        response = viewer_client.get("/resources/")
+        assert response.status_code == 200
+        content = response.content.decode()
+        # 20 entries = exactly one page → no nav
+        assert 'class="pagination"' not in content
+
+    def test_audit_log_pagination_link_in_partial_is_htmx_aware(self, admin_client):
+        """The pagination link must carry the hx-* attributes so swaps survive."""
+        _make_audit_logs(25)
+        response = admin_client.get("/audit_log/", HTTP_HX_REQUEST="true")
+        assert response.status_code == 200
+        content = response.content.decode()
+
+        # The page-2 link must be htmx-driven AND have a non-htmx fallback href
+        assert 'hx-get="?page=2"' in content
+        assert 'hx-target="#main"' in content
+        assert 'hx-push-url="true"' in content
+        # Fallback href so non-JS clients can still navigate
+        assert 'href="?page=2"' in content
+
+    def test_user_management_pagination_link_is_htmx_aware(self, admin_client):
+        """Pagination links in the user_management partial must use htmx attrs."""
+        # Create enough users to require pagination
+        User.objects.bulk_create(
+            [User(username=f"htmx-pg-{i:02d}", email=f"h{i}@x.com") for i in range(1, 26)]
+        )
+        response = admin_client.get("/users/manage/", HTTP_HX_REQUEST="true")
+        assert response.status_code == 200
+        content = response.content.decode()
+
+        assert 'hx-get="?page=2"' in content
+        assert 'hx-target="#main"' in content
+        assert 'hx-push-url="true"' in content
+
+    def test_resource_list_pagination_link_is_htmx_aware(self, viewer_client):
+        """Pagination links in the resource_list partial must use htmx attrs."""
+        Resource.objects.bulk_create(
+            [Resource(name=f"htmx-r-pg-{i:02d}", resource_type="server") for i in range(1, 26)]
+        )
+        response = viewer_client.get("/resources/", HTTP_HX_REQUEST="true")
+        assert response.status_code == 200
+        content = response.content.decode()
+
+        assert 'hx-get="?page=2"' in content
+        assert 'hx-target="#main"' in content
+        assert 'hx-push-url="true"' in content
+
+    def test_pagination_partial_renders_nothing_for_single_page(self):
+        """The partial itself must produce empty output for a 1-page queryset.
+
+        Guards against wasted UI noise when a small dataset is rendered.
+        """
+        from django.test import RequestFactory
+        from core.views import _paginate
+        from core.models import Resource
+
+        Resource.objects.bulk_create(
+            [Resource(name=f"single-{i}", resource_type="server") for i in range(5)]
+        )
+        request = RequestFactory().get("/resources/")
+        page_obj, paginator = _paginate(request, Resource.objects.all().order_by("name"))
+
+        from django.template.loader import render_to_string
+
+        html = render_to_string(
+            "core/_pagination.html",
+            {"page_obj": page_obj, "paginator": paginator, "page_url_name": "resource_list"},
+        )
+        assert html.strip() == ""
