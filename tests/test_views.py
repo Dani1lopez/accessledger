@@ -391,37 +391,101 @@ class TestGrantCreateView:
 
 @pytest.mark.django_db
 class TestGrantRevokeView:
-    def test_editor_cannot_revoke(self, editor_client):
+    @staticmethod
+    def _make_active_grant():
+        """Create a fresh user, resource, and ACTIVE AccessGrant for revoke tests."""
         target_user = User.objects.create_user(username="target", password="pass")
         resource = Resource.objects.create(
-            name="test-server",
-            resource_type="server",
+            name="test-server", resource_type="server"
         )
-        grant = AccessGrant.objects.create(
+        return AccessGrant.objects.create(
             user=target_user,
             resource=resource,
             access_level=AccessGrant.AccessLevel.READ,
             start_at=timezone.now(),
             end_at=timezone.now() + timedelta(days=30),
         )
+
+    def test_editor_cannot_revoke(self, editor_client):
+        """Editor POST on /grants/<pk>/revoke must 403 AND leave grant ACTIVE with no audit row."""
+        grant = self._make_active_grant()
         response = editor_client.post(f"/grants/{grant.pk}/revoke")
+        # 403 — permission denied
         assert response.status_code == 403
+        # grant remains ACTIVE — permission check must run before any mutation
+        grant.refresh_from_db()
+        assert grant.status == AccessGrant.Status.ACTIVE
+        # no audit log row created on rejected POST
+        assert AuditLog.objects.filter(object_id=grant.pk).count() == 0
 
     def test_admin_can_revoke(self, admin_client):
-        target_user = User.objects.create_user(username="target", password="pass")
-        resource = Resource.objects.create(
-            name="test-server",
-            resource_type="server",
-        )
-        grant = AccessGrant.objects.create(
-            user=target_user,
-            resource=resource,
-            access_level=AccessGrant.AccessLevel.READ,
-            start_at=timezone.now(),
-            end_at=timezone.now() + timedelta(days=30),
-        )
+        grant = self._make_active_grant()
         response = admin_client.post(f"/grants/{grant.pk}/revoke")
         assert response.status_code == 302
+
+    def test_anonymous_get_redirects_to_login(self, client):
+        """Anonymous GET on /grants/<pk>/revoke must redirect to login, never mutate."""
+        grant = self._make_active_grant()
+        url = f"/grants/{grant.pk}/revoke"
+        response = client.get(url)
+        # 302 to login
+        assert response.status_code == 302
+        assert response.url.startswith("/login/")
+        assert f"next={url}" in response.url
+        # grant untouched, no audit row
+        grant.refresh_from_db()
+        assert grant.status == AccessGrant.Status.ACTIVE
+        assert AuditLog.objects.filter(object_id=grant.pk).count() == 0
+
+    def test_anonymous_post_redirects_to_login(self, client):
+        """Anonymous POST on /grants/<pk>/revoke must redirect to login, never mutate."""
+        grant = self._make_active_grant()
+        url = f"/grants/{grant.pk}/revoke"
+        response = client.post(url)
+        # 302 to login
+        assert response.status_code == 302
+        assert response.url.startswith("/login/")
+        assert f"next={url}" in response.url
+        # grant untouched, no audit row
+        grant.refresh_from_db()
+        assert grant.status == AccessGrant.Status.ACTIVE
+        assert AuditLog.objects.filter(object_id=grant.pk).count() == 0
+
+    def test_editor_get_returns_403(self, editor_client):
+        """Editor GET on /grants/<pk>/revoke must 403, never mutate."""
+        grant = self._make_active_grant()
+        response = editor_client.get(f"/grants/{grant.pk}/revoke")
+        assert response.status_code == 403
+        grant.refresh_from_db()
+        assert grant.status == AccessGrant.Status.ACTIVE
+        assert AuditLog.objects.filter(object_id=grant.pk).count() == 0
+
+    def test_admin_get_returns_405_and_does_not_mutate(self, admin_client):
+        """Admin GET on /grants/<pk>/revoke must return 405, leaving grant ACTIVE and no audit row."""
+        grant = self._make_active_grant()
+        response = admin_client.get(f"/grants/{grant.pk}/revoke")
+        # 405 is the new contract — previously this returned 302 (silent redirect).
+        assert response.status_code == 405
+        # grant stays ACTIVE
+        grant.refresh_from_db()
+        assert grant.status == AccessGrant.Status.ACTIVE
+        # no audit log row created on GET
+        assert AuditLog.objects.filter(object_id=grant.pk).count() == 0
+
+    def test_admin_post_revokes_and_writes_audit_log(self, admin_client):
+        """Admin POST on /grants/<pk>/revoke must revoke the grant and write GRANT_REVOKED audit row."""
+        grant = self._make_active_grant()
+        response = admin_client.post(f"/grants/{grant.pk}/revoke")
+        # redirects to resource detail for this grant
+        assert response.status_code == 302
+        assert response.url == f"/resources/{grant.resource.pk}/"
+        grant.refresh_from_db()
+        assert grant.status == AccessGrant.Status.REVOKED
+        # exactly one GRANT_REVOKED audit row for this grant
+        audit_rows = AuditLog.objects.filter(
+            object_id=grant.pk, action=AuditLog.Action.GRANT_REVOKED
+        )
+        assert audit_rows.count() == 1
 
 
 @pytest.mark.django_db

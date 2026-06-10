@@ -3,6 +3,7 @@ from django.contrib.auth.decorators import permission_required, login_required
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.http import JsonResponse, HttpResponseNotAllowed
+from django.views.decorators.http import require_POST
 from core.decorators import admin_required
 from core.forms import AccessGrantForm, ResourceForm, UserForm, UserCreateForm
 from core.permissions import user_can_modify_resource
@@ -243,39 +244,37 @@ def grant_create(request, resource_pk):
 
 @login_required
 @permission_required("core.can_revoke_access", raise_exception=True)
+@require_POST
 def grant_revoke(request, pk):
     grant = get_object_or_404(AccessGrant, pk=pk)
-    if request.method == "POST":
-        before = {
-            "user": grant.user.username,
-            "resource": grant.resource.name,
-            "access_level": grant.access_level,
-            "status": grant.status,
-            "start_at": grant.start_at.isoformat(),
-            "end_at": grant.end_at.isoformat() if grant.end_at else None,
-            "notes": grant.notes,
-        }
-        grant.status = AccessGrant.Status.REVOKED
-        grant.save()
-        after = {
-            "user": grant.user.username,
-            "resource": grant.resource.name,
-            "access_level": grant.access_level,
-            "status": grant.status,
-            "start_at": grant.start_at.isoformat(),
-            "end_at": grant.end_at.isoformat() if grant.end_at else None,
-            "notes": grant.notes,
-        }
-        log_action(
-            user=request.user,
-            action=AuditLog.Action.GRANT_REVOKED,
-            obj=grant,
-            before=before,
-            after=after,
-        )
-        return redirect("resource_detail", pk=grant.resource.pk)
-    else:
-        return redirect("resource_detail", pk=grant.resource.pk)
+    before = {
+        "user": grant.user.username,
+        "resource": grant.resource.name,
+        "access_level": grant.access_level,
+        "status": grant.status,
+        "start_at": grant.start_at.isoformat(),
+        "end_at": grant.end_at.isoformat() if grant.end_at else None,
+        "notes": grant.notes,
+    }
+    grant.status = AccessGrant.Status.REVOKED
+    grant.save()
+    after = {
+        "user": grant.user.username,
+        "resource": grant.resource.name,
+        "access_level": grant.access_level,
+        "status": grant.status,
+        "start_at": grant.start_at.isoformat(),
+        "end_at": grant.end_at.isoformat() if grant.end_at else None,
+        "notes": grant.notes,
+    }
+    log_action(
+        user=request.user,
+        action=AuditLog.Action.GRANT_REVOKED,
+        obj=grant,
+        before=before,
+        after=after,
+    )
+    return redirect("resource_detail", pk=grant.resource.pk)
 
 
 @login_required
