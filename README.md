@@ -2,7 +2,7 @@
 
 # 🔐 AccessLedger
 
-**Internal access control system built with Django — manage, audit, and enforce resource permissions across your organization.**
+**Internal access control system built with Django — track, audit, and govern resource permissions across your organization.**
 
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
 ![Django](https://img.shields.io/badge/Django-5.2-092E20?logo=django&logoColor=white)
@@ -304,7 +304,7 @@ Security is a first-class concern in AccessLedger. The following measures are im
 
 - **Brute force protection** — `django-axes` monitors login attempts; after **5 failed attempts**, the account is locked for **1 hour**
 - **Forced password change** — custom `ForcePasswordChangeMiddleware` redirects new users to change their initial password before accessing any resource
-- **Role-based access** — Django's `@permission_required` decorator enforces per-group permissions; a custom `@admin_required` decorator protects admin-only views
+- **Role-based access** — Django's `@permission_required` decorator controls per-group permissions; a custom `@admin_required` decorator protects admin-only views
 - **Session security** — Django's built-in session framework with secure defaults
 
 ### Data Integrity
@@ -399,6 +399,13 @@ POSTGRES_HOST=127.0.0.1 POSTGRES_PORT=5434 pytest -v
 ---
 
 ## 🗺 Roadmap
+
+> **V2 foundations (skeleton).** A V2 adapter contract exists under
+> `core/adapters/` for describing — and one day integrating with —
+> external services. The skeleton is **no-op**: no live provider
+> integration, no scheduled execution, and no production I/O. Real
+> adapters are future SDD cycles; see `docs/adapters.md` for the
+> contract and the explicit non-goals.
 
 - [ ] Password change events in the audit log
 - [ ] REST API with Django REST Framework
