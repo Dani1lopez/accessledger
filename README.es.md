@@ -2,7 +2,7 @@
 
 # 🔐 AccessLedger
 
-**Sistema interno de control de accesos desarrollado con Django — gestiona, audita y aplica permisos sobre los recursos de una organización.**
+**Sistema interno de control de accesos desarrollado con Django — gestiona, audita y gobierna los permisos sobre los recursos de una organización.**
 
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
 ![Django](https://img.shields.io/badge/Django-5.2-092E20?logo=django&logoColor=white)
@@ -304,7 +304,7 @@ La seguridad es una prioridad de primer nivel en AccessLedger. Se han implementa
 
 - **Protección contra fuerza bruta** — `django-axes` monitoriza los intentos de inicio de sesión; tras **5 intentos fallidos**, la cuenta se bloquea durante **1 hora**
 - **Cambio de contraseña forzado** — el middleware personalizado `ForcePasswordChangeMiddleware` redirige a los nuevos usuarios para que cambien su contraseña inicial antes de acceder a cualquier recurso
-- **Acceso basado en roles** — el decorador `@permission_required` de Django aplica permisos por grupo; un decorador personalizado `@admin_required` protege las vistas exclusivas de administración
+- **Acceso basado en roles** — el decorador `@permission_required` de Django controla los permisos por grupo; un decorador personalizado `@admin_required` protege las vistas exclusivas de administración
 - **Seguridad de sesión** — framework de sesiones integrado de Django con configuración segura por defecto
 
 ### Integridad de datos
@@ -399,6 +399,13 @@ POSTGRES_HOST=127.0.0.1 POSTGRES_PORT=5434 pytest -v
 ---
 
 ## 🗺 Hoja de ruta
+
+> **Fundamentos V2 (esqueleto).** Existe un contrato de adaptadores V2
+> bajo `core/adapters/` para describir — y eventualmente integrar con —
+> servicios externos. El esqueleto es **no-op**: no hay integración
+> real con proveedores, no hay ejecución programada, y no hay I/O de
+> producción. Los adaptadores reales son ciclos SDD futuros; consulta
+> `docs/adapters.md` para ver el contrato y los no-objetivos explícitos.
 
 - [ ] Registro de cambios de contraseña en el audit log
 - [ ] API REST con Django REST Framework
