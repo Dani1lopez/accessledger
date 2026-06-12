@@ -10,7 +10,7 @@
 
 ## Executive Summary
 
-**AccessLedger** is a Django 5.2.10 monolith that manages access grants to technology resources (servers, repositories, VPNs, SaaS, databases, dashboards). It uses a single Django app (`core`) with four models—`Resource`, `AccessGrant`, `Profile`, and `AuditLog`—backed by PostgreSQL (psycopg 3). Authentication is Django’s built-in `User` model extended via a `OneToOne` `Profile` that forces a password change on first login. Authorization is group-based RBAC with three hardcoded roles (`viewer`, `editor`, `admin`) and two custom model permissions (`can_grant_access`, `can_revoke_access`). The UI is a dark-minimal, vanilla-JavaScript + HTMX hybrid: HTMX handles SPA-style page swaps (`hx-target="#main"`), while CRUD mutations are driven by delegated event handlers on `#main` that open native `<dialog>` modals and submit via `fetch()`. Static files are served by WhiteNoise, and the production target is Railway (though several config defaults still reference Render).
+**AccessLedger** is a Django 5.2.15 monolith that manages access grants to technology resources (servers, repositories, VPNs, SaaS, databases, dashboards). It uses a single Django app (`core`) with four models—`Resource`, `AccessGrant`, `Profile`, and `AuditLog`—backed by PostgreSQL (psycopg 3). Authentication is Django’s built-in `User` model extended via a `OneToOne` `Profile` that forces a password change on first login. Authorization is group-based RBAC with three hardcoded roles (`viewer`, `editor`, `admin`) and two custom model permissions (`can_grant_access`, `can_revoke_access`). The UI is a dark-minimal, vanilla-JavaScript + HTMX hybrid: HTMX handles SPA-style page swaps (`hx-target="#main"`), while CRUD mutations are driven by delegated event handlers on `#main` that open native `<dialog>` modals and submit via `fetch()`. Static files are served by WhiteNoise, and the production target is Railway (though several config defaults still reference Render).
 
 The most important operational risks are: **(1)** the absence of object-level permissions means any `editor` can modify or delete any `Resource`, regardless of ownership; **(2)** no pagination, filtering, or caching on list views (`resource_list`, `audit_log`, `user_management`) creates predictable performance bottlenecks; **(3)** critical security gaps including a missing Content-Security-Policy, misconfigured `CSRF_TRUSTED_ORIGINS`, and a Dockerfile that runs as root; **(4)** the management command `expire_grants` silently marks grants as `expired` without writing to `AuditLog`, breaking the otherwise comprehensive audit trail. These issues are documented in detail in the Risk Matrix (Section 11) and should be addressed before the application scales beyond its current demo-sized footprint.
 
@@ -22,7 +22,7 @@ The most important operational risks are: **(1)** the absence of object-level pe
 
 | Fact | Detail | Source |
 |------|--------|--------|
-| Django version | 5.2.10 | `settings.py` |
+| Django version | 5.2.15 | `settings.py` |
 | Python version | 3.12 | `Dockerfile` |
 | Database | PostgreSQL 16 (psycopg 3.3.2) | `settings.py`, `docker-compose.yml` |
 | Static files | WhiteNoise 6.12 (`CompressedStaticFilesStorage`) | `settings.py` |
