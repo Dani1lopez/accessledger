@@ -351,15 +351,7 @@ AccessLedger features a custom **dark theme UI** built entirely with native web 
 
 ## 🧪 Testing
 
-The project includes a suite of 22 automated tests built with pytest-django, covering three layers:
-
-| Layer | File | Tests |
-|-------|------|-------|
-| Form validation | `tests/test_forms.py` | 7 |
-| Model logic & signals | `tests/test_models.py` | 4 |
-| View permissions and user flows | `tests/test_views.py` | 11 |
-
-Tests verify form edge cases (duplicate names, invalid date ranges), model `__str__` methods, the auto-creation of `Profile` via Django signals, and that each role (`viewer`, `editor`, `admin`) can only access the views their permissions allow.
+The project ships with a pytest-django test suite that covers form edge cases (duplicate names, invalid date ranges), model `__str__` methods, the auto-creation of `Profile` via Django signals, and that each role (`viewer`, `editor`, `admin`) can only access the views their permissions allow. The suite is run as a single command — see below for the canonical invocation; the per-file test count is intentionally not frozen in this README.
 
 ### Recommended: run tests inside Docker
 
