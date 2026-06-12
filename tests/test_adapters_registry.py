@@ -44,6 +44,23 @@ class TestRegisterDecoratorRejectsNonAdapters:
             registry.register(_not_a_class)
 
 
+class TestRegisterDecoratorRejectsAbstractAdapters:
+    """Abstract / incomplete ResourceAdapter subclasses must be rejected so
+    a future refactor cannot silently allow non-concrete adapters into the
+    registry. Concrete adapters (control set: DemoAdapter) must still pass.
+    """
+
+    def test_rejects_resourceadapter_abc_itself(self):
+        with pytest.raises(registry.AdapterRegistrationError):
+            registry.register(ResourceAdapter)
+
+    def test_rejects_subclass_that_does_not_override_sync(self):
+        class _Incomplete(ResourceAdapter):
+            pass
+        with pytest.raises(registry.AdapterRegistrationError):
+            registry.register(_Incomplete)
+
+
 class TestGetAdapterRejection:
     def test_unknown_path_raises(self):
         with pytest.raises(registry.AdapterLookupError):

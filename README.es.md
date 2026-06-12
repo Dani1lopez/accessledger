@@ -351,15 +351,7 @@ AccessLedger cuenta con una interfaz de usuario con **tema oscuro** personalizad
 
 ## 🧪 Tests
 
-El proyecto incluye una suite de 22 tests automatizados construida con pytest-django, cubriendo tres capas:
-
-| Capa | Archivo | Tests |
-|------|---------|-------|
-| Validación de formularios | `tests/test_forms.py` | 7 |
-| Lógica de modelos y señales | `tests/test_models.py` | 4 |
-| Permisos de vistas y flujos de usuario | `tests/test_views.py` | 11 |
-
-Los tests verifican casos borde en formularios (nombres duplicados, rangos de fechas inválidos), los métodos `__str__` de los modelos, la creación automática de `Profile` mediante señales de Django, y que cada rol (`viewer`, `editor`, `admin`) solo puede acceder a las vistas que sus permisos permiten.
+El proyecto incluye una suite de tests con pytest-django que cubre casos borde de formularios (nombres duplicados, rangos de fechas inválidos), los métodos `__str__` de los modelos, la creación automática de `Profile` mediante señales de Django, y que cada rol (`viewer`, `editor`, `admin`) solo puede acceder a las vistas que sus permisos permiten. La suite se ejecuta con un único comando — consultá la invocación canónica más abajo; el conteo por archivo no se congela deliberadamente en este README.
 
 ### Recomendado: ejecutar tests dentro de Docker
 
