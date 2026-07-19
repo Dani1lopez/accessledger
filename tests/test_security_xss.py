@@ -183,3 +183,45 @@ class TestPasswordChangeXSSRegression:
         assert response.status_code == 200
         actual = _data_username_value(response.content.decode())
         assert actual == xss_user.get_username()
+
+    def test_password_change_html_tag_username(self, client):
+        """HTML tags in the username remain escaped inside the attribute."""
+        username = "<b>test</b>"
+        user = User.objects.create_user(username=username, password="SafePass123!")
+        assert client.login(username=username, password="SafePass123!") is True
+
+        response = client.get("/password/change/")
+
+        assert response.status_code == 200
+        content = response.content.decode()
+        assert "<b>test</b>" not in content
+        assert "&lt;b&gt;test&lt;/b&gt;" in content
+        assert _data_username_value(content) == user.get_username()
+
+    def test_password_change_backslash_username(self, client):
+        """Backslashes are preserved as data, not interpreted as JavaScript."""
+        username = r"evil\username"
+        user = User.objects.create_user(username=username, password="SafePass123!")
+        assert client.login(username=username, password="SafePass123!") is True
+
+        response = client.get("/password/change/")
+
+        assert response.status_code == 200
+        content = response.content.decode()
+        assert 'const USERNAME = "' not in content
+        assert _data_username_value(content) == user.get_username()
+
+    def test_password_change_empty_username(self, client):
+        """An empty username is handled by the defensive form path."""
+        user = User(username="")
+        user.set_password("SafePass123!")
+        user.save()
+        assert client.login(username="", password="SafePass123!") is True
+
+        response = client.get("/password/change/")
+
+        assert response.status_code == 200
+        content = response.content.decode()
+        assert 'id="id_new_password1"' in content
+        assert 'data-username=""' in content
+        assert _data_username_value(content) == user.get_username()

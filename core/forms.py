@@ -55,6 +55,7 @@ class CustomPasswordChangeForm(PasswordChangeForm):
     def __init__(self, user, *args, **kwargs):
         self.user = user
         super().__init__(user, *args, **kwargs)
-        self.fields["new_password1"].widget.attrs["data-username"] = (
-            user.get_username()
-        )
+        if user is not None:
+            self.fields["new_password1"].widget.attrs["data-username"] = (
+                user.get_username()
+            )
