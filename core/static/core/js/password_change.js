@@ -6,6 +6,7 @@ const COMMON = [
 ];
 
 const input = document.getElementById("id_new_password1");
+const USERNAME = input.dataset.username || "";
 const bars = [
   document.getElementById("bar1"),
   document.getElementById("bar2"),
