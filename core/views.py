@@ -5,7 +5,7 @@ from django.core.paginator import Paginator
 from django.http import JsonResponse, HttpResponseNotAllowed
 from django.views.decorators.http import require_POST
 from core.decorators import admin_required
-from core.forms import AccessGrantForm, ResourceForm, UserForm, UserCreateForm
+from core.forms import AccessGrantForm, ResourceForm, UserForm, UserCreateForm, CustomPasswordChangeForm
 from core.permissions import user_can_modify_resource
 from .models import AccessGrant, Resource, Profile, AuditLog
 from django.contrib.auth.models import User, Group
@@ -285,6 +285,7 @@ def user_list(request):
 
 
 class CustomPasswordChangeView(PasswordChangeView):
+    form_class = CustomPasswordChangeForm
     success_url = reverse_lazy("resource_list")
 
     def get_context_data(self, **kwargs):

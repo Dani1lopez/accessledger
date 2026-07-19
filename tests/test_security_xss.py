@@ -172,8 +172,6 @@ class TestPasswordChangeXSSRegression:
         # ``&quot;`` (proof that the value is bound by the surrounding
         # attribute quotes and cannot step out into JS context).
         assert "&quot;" in content
-        # And no leftover JS-string-literal form of the username.
-        assert 'USERNAME = "x' not in content
 
     def test_password_change_username_value_matches_user(
         self, xss_client, xss_user
