@@ -3,9 +3,6 @@
 SEC-002 carve-out: REQ-001 through REQ-007 from
 `sdd/fix-entrypoint-shell-injection/spec`. Strict TDD — these tests MUST
 fail before the command exists and pass after the GREEN implementation.
-
-DB host fixup lives in `tests/conftest.py` (pytest_configure hook) so it
-runs before pytest-django's `django_db_setup` creates the test DB.
 """
 import io
 from pathlib import Path

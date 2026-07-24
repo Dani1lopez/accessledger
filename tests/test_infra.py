@@ -283,3 +283,71 @@ class TestEntrypointSeedLogic:
         assert "python manage.py ensure_superuser" in content, (
             "entrypoint.sh must invoke `python manage.py ensure_superuser`"
         )
+
+
+# ── R4-001 regression: DB host not forcibly rewritten ────────────────────
+
+class TestConftestDoesNotMutateEnv:
+    """R4-001: root conftest.py must not set POSTGRES_HOST / POSTGRES_PORT."""
+
+    def test_root_conftest_does_not_set_postgres_env(self):
+        """Root conftest.py must not unconditionally set POSTGRES_HOST."""
+        conftest_path = Path(__file__).resolve().parent.parent / "conftest.py"
+        content = conftest_path.read_text()
+        assert "POSTGRES_HOST" not in content, (
+            "conftest.py must not set POSTGRES_HOST"
+        )
+        assert "POSTGRES_PORT" not in content, (
+            "conftest.py must not set POSTGRES_PORT"
+        )
+
+
+class TestSettingsTestOverrideBehavior:
+    """R4-001: settings_test.py load_dotenv must use override=False."""
+
+    def test_override_is_false(self):
+        """settings_test.py must call load_dotenv with override=False."""
+        path = (
+            Path(__file__).resolve().parent.parent
+            / "accessledger" / "settings_test.py"
+        )
+        content = path.read_text()
+        assert "override=False" in content, (
+            "settings_test.py must use override=False so env vars can override "
+            ".env.test defaults"
+        )
+
+    def test_override_true_is_absent(self):
+        """settings_test.py must NOT contain override=True."""
+        path = (
+            Path(__file__).resolve().parent.parent
+            / "accessledger" / "settings_test.py"
+        )
+        content = path.read_text()
+        assert "override=True" not in content, (
+            "settings_test.py must not use override=True"
+        )
+
+
+class TestTestsConftestDeleted:
+    """R4-001: tests/conftest.py must not exist."""
+
+    def test_tests_conftest_does_not_exist(self):
+        """tests/conftest.py must be deleted — it forced DB HOST=127.0.0.1."""
+        path = Path(__file__).resolve().parent / "conftest.py"
+        assert not path.exists(), (
+            "tests/conftest.py must be deleted; it forced "
+            "settings.DATABASES['default']['HOST'] = '127.0.0.1'"
+        )
+
+
+class TestEffectiveDbHostNotForceRewritten:
+    """R4-001: loaded Django settings HOST must not be forcibly rewritten."""
+
+    def test_db_host_is_not_empty(self):
+        """settings.DATABASES HOST must be a non-empty string from env or .env.test."""
+        from django.conf import settings
+
+        host = settings.DATABASES["default"]["HOST"]
+        assert host, "DATABASES HOST must be a non-empty string"
+        assert isinstance(host, str)
