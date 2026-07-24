@@ -4,21 +4,15 @@ SEC-002 carve-out: REQ-001 through REQ-007 from
 `sdd/fix-entrypoint-shell-injection/spec`. Strict TDD — these tests MUST
 fail before the command exists and pass after the GREEN implementation.
 
-DB host fixup: settings_test loads `.env.test` with `override=True`, which
-sets POSTGRES_HOST=db (the docker-compose hostname). For local test runs
-where no docker network exists, the session-scoped `_redirect_db_to_local`
-fixture rewrites `settings.DATABASES['default']['HOST']` to 127.0.0.1.
-This is a test-runtime workaround for the broken default; production
-docker still resolves 'db' correctly.
+DB host fixup lives in `tests/conftest.py` (pytest_configure hook) so it
+runs before pytest-django's `django_db_setup` creates the test DB.
 """
 import io
-import os
 from pathlib import Path
 from unittest import mock
 
 import pytest
-from django.conf import settings
-from django.contrib.auth.models import Group, Permission, User
+from django.contrib.auth.models import Group, User
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.db import OperationalError
@@ -26,27 +20,12 @@ from django.db import OperationalError
 from core.permissions.constants import ADMIN_GROUP_PERMISSIONS
 
 
-# ── Test-only DB-host fixup ─────────────────────────────────────────────
-
-@pytest.fixture(scope="session", autouse=True)
-def _redirect_db_to_local(django_db_setup, django_db_blocker):
-    """Force the test DB connection to localhost.
-
-    The project's `accessledger/settings_test.py` loads `.env.test` with
-    `override=True`, which sets POSTGRES_HOST=db (the docker-compose
-    service name). When tests run outside docker, that hostname is
-    unresolvable. Mutate settings.DATABASES at session start so the DB
-    connection points to 127.0.0.1 instead — production deploy is
-    unaffected.
-    """
-    settings.DATABASES["default"]["HOST"] = "127.0.0.1"
-    yield
-
-
 # ── Test suite ──────────────────────────────────────────────────────────
 
 class TestEnsureSuperuserCommand:
     """Strict TDD: REQ-001–007 → one test per scenario."""
+
+    pytestmark = pytest.mark.django_db
 
     # --- REQ-001: shell-metachars are data, not source ---
 
@@ -54,7 +33,7 @@ class TestEnsureSuperuserCommand:
         """Username/password with ', $, !, ;, backticks create the right user."""
         monkeypatch.setenv("DJANGO_SUPERUSER_USERNAME", "u'`rm -rf /`'")
         monkeypatch.setenv("DJANGO_SUPERUSER_PASSWORD", 'p$a$s"w;')
-        monkeypatch.setenv("DJANGO_SUPERUSER_EMAIL", "a@b.c")
+        monkeypatch.setenv("DJANGO_SUPERUSER_EMAIL", "a@example.com")
         # /tmp is shared; use a unique sentinel inside tmp_path
         sentinel = tmp_path / "pwn"
         monkeypatch.setenv("DJANGO_SUPERUSER_USERNAME", "u'`rm -rf /`'")
@@ -65,7 +44,7 @@ class TestEnsureSuperuserCommand:
         user = User.objects.get(username="u'`rm -rf /`'")
         assert user.is_superuser is True
         assert user.is_staff is True
-        assert user.email == "a@b.c"
+        assert user.email == "a@example.com"
         # No side-effect file materialized anywhere
         assert not sentinel.exists(), (
             "ensure_superuser must not invoke the shell on the username"
@@ -76,7 +55,7 @@ class TestEnsureSuperuserCommand:
         """`$(touch /tmp/pwn)` in username is stored verbatim; no touch runs."""
         monkeypatch.setenv("DJANGO_SUPERUSER_USERNAME", "$(touch /tmp/pwn)")
         monkeypatch.setenv("DJANGO_SUPERUSER_PASSWORD", "irrelevant")
-        monkeypatch.setenv("DJANGO_SUPERUSER_EMAIL", "a@b.c")
+        monkeypatch.setenv("DJANGO_SUPERUSER_EMAIL", "a@example.com")
         pwn = Path("/tmp/pwn")
         # Defensive: clear any leftover from previous tests
         if pwn.exists():
@@ -213,7 +192,7 @@ class TestEnsureSuperuserCommand:
         """Created branch logs `[ensure_superuser]` + `created` substring."""
         monkeypatch.setenv("DJANGO_SUPERUSER_USERNAME", "admin7")
         monkeypatch.setenv("DJANGO_SUPERUSER_PASSWORD", "pw")
-        monkeypatch.setenv("DJANGO_SUPERUSER_EMAIL", "a@b.c")
+        monkeypatch.setenv("DJANGO_SUPERUSER_EMAIL", "a@example.com")
         out = io.StringIO()
         call_command("ensure_superuser", stdout=out)
         text = out.getvalue()
@@ -224,7 +203,7 @@ class TestEnsureSuperuserCommand:
         """Existing-user branch logs `[ensure_superuser]` + `already exists` substring."""
         monkeypatch.setenv("DJANGO_SUPERUSER_USERNAME", "admin8")
         monkeypatch.setenv("DJANGO_SUPERUSER_PASSWORD", "pw")
-        monkeypatch.setenv("DJANGO_SUPERUSER_EMAIL", "a@b.c")
+        monkeypatch.setenv("DJANGO_SUPERUSER_EMAIL", "a@example.com")
         # First run creates
         call_command("ensure_superuser", stdout=io.StringIO())
         # Second run sees it as existing
