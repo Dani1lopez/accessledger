@@ -99,6 +99,39 @@ class TestEnsureSuperuserCommand:
         # Exactly one user with that username
         assert User.objects.filter(username="admin1").count() == 1
 
+    # --- REQ-002/010: --reset opt-in overrides idempotency ---
+
+    def test_reset_overwrites_existing_user_password(self, monkeypatch):
+        """--reset flag explicitly overwrites password and email on existing user.
+
+        Default path is idempotent (test_runs_twice_does_not_overwrite_password).
+        --reset is the manual rotation escape hatch.
+        """
+        # First run: create user with old credentials (default path).
+        monkeypatch.setenv("DJANGO_SUPERUSER_USERNAME", "resetuser")
+        monkeypatch.setenv("DJANGO_SUPERUSER_PASSWORD", "oldPass!1")
+        monkeypatch.setenv("DJANGO_SUPERUSER_EMAIL", "old@example.com")
+        call_command("ensure_superuser", stdout=io.StringIO())
+
+        user = User.objects.get(username="resetuser")
+        assert user.check_password("oldPass!1")
+        assert user.email == "old@example.com"
+
+        # Second run with --reset and new credentials.
+        monkeypatch.setenv("DJANGO_SUPERUSER_PASSWORD", "newPass!2")
+        monkeypatch.setenv("DJANGO_SUPERUSER_EMAIL", "new@example.com")
+        call_command("ensure_superuser", reset=True, stdout=io.StringIO())
+
+        user.refresh_from_db()
+        assert user.check_password("newPass!2"), (
+            "--reset must overwrite the existing user's password"
+        )
+        assert user.email == "new@example.com", (
+            "--reset must overwrite the existing user's email"
+        )
+        # Exactly one user with that username.
+        assert User.objects.filter(username="resetuser").count() == 1
+
     # --- REQ-003: admin group auto-created and assigned ---
 
     def test_creates_admin_group_when_missing(self, monkeypatch):
