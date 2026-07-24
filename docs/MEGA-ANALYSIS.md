@@ -332,7 +332,7 @@ The most important operational risks are: **(1)** the absence of object-level pe
 | URL routes (project) | 6 (`/`, `/admin/`, `/login/`, `/logout/`, `/password/change/`, `/password/change/done/`) | `accessledger/urls.py` |
 | URL routes (core) | 16 | `core/urls.py` |
 | Total forms | 4 (`AccessGrantForm`, `ResourceForm`, `UserForm`, `UserCreateForm`) | `core/forms.py` |
-| Management commands | 3 (`seed_data`, `expire_grants`, `bootstrap_roles`) | `core/management/commands/` |
+| Management commands | 4 (`seed_data`, `expire_grants`, `bootstrap_roles`, `ensure_superuser`) | `core/management/commands/` |
 | Audit utility | `log_action()` in `core/utils.py` | `core/utils.py` |
 | `app_name` / namespace | **Not defined** in `core/urls.py` | `core/urls.py` |
 
