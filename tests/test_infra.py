@@ -243,3 +243,43 @@ class TestEntrypointSeedLogic:
         assert "SEED_RUN" in result.stdout, (
             f"Production opt-in should trigger seed, got: {result.stdout}"
         )
+
+    # ── SEC-002 carve-out: entrypoint delegates superuser creation ──────
+
+    def test_createsuperuser_not_in_entrypoint(self, entrypoint_path):
+        """SEC-002: entrypoint.sh must NOT call `createsuperuser` directly.
+
+        `createsuperuser --noinput --username "$VAR" --email "$VAR"` was
+        the original shell-injection sink — the unquoted $VAR path could
+        leak values into the shell. Now delegated to the ensure_superuser
+        management command which reads env via os.environ.
+        """
+        content = entrypoint_path.read_text()
+        assert "createsuperuser" not in content, (
+            "entrypoint.sh must not invoke `createsuperuser`; "
+            "delegate to `python manage.py ensure_superuser` instead."
+        )
+
+    def test_shell_c_not_in_entrypoint(self, entrypoint_path):
+        """SEC-002: entrypoint.sh must NOT use `shell -c` to interpolate env vars.
+
+        The original vulnerable block used `python manage.py shell -c "..."
+        with $DJANGO_SUPERUSER_USERNAME interpolated into Python source —
+        a direct command-substitution RCE sink. Now removed.
+        """
+        content = entrypoint_path.read_text()
+        assert "shell -c" not in content, (
+            "entrypoint.sh must not use `manage.py shell -c`; "
+            "this was the original shell-injection sink."
+        )
+
+    def test_ensure_superuser_invoked(self, entrypoint_path):
+        """SEC-002: entrypoint.sh MUST call `python manage.py ensure_superuser`.
+
+        This is the new (safe) delegation point — values are read via
+        os.environ inside the command, not interpolated into shell.
+        """
+        content = entrypoint_path.read_text()
+        assert "python manage.py ensure_superuser" in content, (
+            "entrypoint.sh must invoke `python manage.py ensure_superuser`"
+        )
