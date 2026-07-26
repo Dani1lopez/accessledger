@@ -98,6 +98,86 @@ class TestEnsureSuperuserCommand:
 
     # --- REQ-002/010: --reset opt-in overrides idempotency ---
 
+    def test_existing_ordinary_user_raises_and_keeps_credentials(self, monkeypatch):
+        """Existing non-staff/non-superuser with the configured username
+        raises before being added to the admin group; credentials are preserved.
+
+        Regression for RISK-001 / RELIABILITY-001: an ordinary account
+        collision must not be silently promoted via the admin group.
+        """
+        username = "ordinary_collision"
+        old_password = "oldPass!1"
+        old_email = "old@example.com"
+        user = User.objects.create_user(
+            username=username,
+            email=old_email,
+            password=old_password,
+            is_staff=False,
+            is_superuser=False,
+        )
+        old_hash = user.password
+        assert not user.groups.filter(name="admin").exists()
+
+        monkeypatch.setenv("DJANGO_SUPERUSER_USERNAME", username)
+        monkeypatch.setenv("DJANGO_SUPERUSER_PASSWORD", "newPass!2")
+        monkeypatch.setenv("DJANGO_SUPERUSER_EMAIL", "new@example.com")
+
+        with pytest.raises(CommandError, match=r"\[ensure_superuser\].*not a superuser"):
+            call_command("ensure_superuser", stdout=io.StringIO())
+
+        user.refresh_from_db()
+        assert user.password == old_hash, (
+            "existing user's password must not be overwritten"
+        )
+        assert user.email == old_email, (
+            "existing user's email must not be overwritten"
+        )
+        assert user.is_staff is False
+        assert user.is_superuser is False
+        assert not user.groups.filter(name="admin").exists(), (
+            "ordinary user must not be added to the admin group"
+        )
+
+    def test_existing_staff_only_user_raises_and_keeps_credentials(self, monkeypatch):
+        """Existing staff-only (not superuser) username raises before being added
+        to the admin group; credentials and flags are preserved.
+
+        Regression for R1-001: a staff-only account must not bypass the guard
+        and receive the admin group on the default existing-user path.
+        """
+        username = "staff_only_collision"
+        old_password = "oldPass!1"
+        old_email = "old@example.com"
+        user = User.objects.create_user(
+            username=username,
+            email=old_email,
+            password=old_password,
+            is_staff=True,
+            is_superuser=False,
+        )
+        old_hash = user.password
+        assert not user.groups.filter(name="admin").exists()
+
+        monkeypatch.setenv("DJANGO_SUPERUSER_USERNAME", username)
+        monkeypatch.setenv("DJANGO_SUPERUSER_PASSWORD", "newPass!2")
+        monkeypatch.setenv("DJANGO_SUPERUSER_EMAIL", "new@example.com")
+
+        with pytest.raises(CommandError, match=r"\[ensure_superuser\].*not a superuser"):
+            call_command("ensure_superuser", stdout=io.StringIO())
+
+        user.refresh_from_db()
+        assert user.password == old_hash, (
+            "existing user's password must not be overwritten"
+        )
+        assert user.email == old_email, (
+            "existing user's email must not be overwritten"
+        )
+        assert user.is_staff is True
+        assert user.is_superuser is False
+        assert not user.groups.filter(name="admin").exists(), (
+            "staff-only user must not be added to the admin group"
+        )
+
     def test_reset_overwrites_existing_user_password(self, monkeypatch):
         """--reset flag explicitly overwrites password and email on existing user.
 

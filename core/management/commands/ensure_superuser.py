@@ -5,6 +5,12 @@ are data, never shell/Python source). On a fresh deploy, creates the
 superuser and the admin group with the standard permission set. Re-runs
 are no-ops for existing users (no password/email overwrite).
 
+Safety rule for existing users: an account that already exists but is
+not a superuser is treated as a username collision. The command fails
+closed with a CommandError rather than silently promoting a non-superuser
+account to the admin group. Use ``--reset`` to explicitly promote/update
+the configured account.
+
 Exit semantics:
 - env vars missing → exit 0, WARNING log (intentional skip).
 - env vars present, any error → exit 1 via CommandError (fail-closed).
@@ -26,7 +32,11 @@ from core.permissions.constants import ADMIN_GROUP_PERMISSIONS
 
 
 class Command(BaseCommand):
-    help = "Idempotent env-driven superuser + admin-group bootstrap."
+    help = (
+        "Idempotent env-driven superuser + admin-group bootstrap. "
+        "Fails closed if the configured username already belongs to a non-superuser account; "
+        "use --reset to promote/update an existing account."
+    )
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -84,6 +94,12 @@ class Command(BaseCommand):
             user.is_staff = True
             user.is_superuser = True
             user.save()
+
+        if not created and not reset and not user.is_superuser:
+            raise CommandError(
+                f"[ensure_superuser] existing user '{username}' is not a superuser; "
+                f"refusing to grant admin group. Use --reset to promote/update."
+            )
 
         user.groups.add(admin)  # idempotent
 
