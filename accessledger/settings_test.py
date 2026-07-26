@@ -3,7 +3,7 @@ import os
 from .settings import *
 from dotenv import load_dotenv
 
-load_dotenv(BASE_DIR / ".env.test", override=True)
+load_dotenv(BASE_DIR / ".env.test", override=False)
 
 SECRET_KEY = os.getenv("SECRET_KEY", "django-insecure-test-key-ci-only")
 

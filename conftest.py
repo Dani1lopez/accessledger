@@ -1,9 +1,5 @@
-import os
 import pytest
 from django.contrib.auth.models import User, Group, Permission
-
-os.environ["POSTGRES_HOST"] = "127.0.0.1"
-os.environ["POSTGRES_PORT"] = "5432"
 
 
 @pytest.fixture 

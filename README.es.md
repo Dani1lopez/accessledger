@@ -224,7 +224,7 @@ docker compose up --build
 
 # 4. En otra terminal — inicializar roles y crear usuario administrador
 docker exec accessledger_web python manage.py bootstrap_roles
-docker exec accessledger_web python manage.py createsuperuser
+docker exec accessledger_web python manage.py ensure_superuser
 
 # 5. (Opcional) Cargar datos de demostración
 docker exec accessledger_web python manage.py seed_data
