@@ -25,7 +25,7 @@ from django.contrib.auth.models import Group, Permission, User
 from django.contrib.contenttypes.models import ContentType
 from django.core.management.base import BaseCommand, CommandError
 from django.core.validators import EmailValidator, ValidationError
-from django.db import OperationalError
+from django.db import OperationalError, transaction
 
 from core.models import Resource
 from core.permissions.constants import ADMIN_GROUP_PERMISSIONS
@@ -84,24 +84,25 @@ class Command(BaseCommand):
             admin.permissions.add(perm)
 
         try:
-            user, created = User.objects.get_or_create(username=username)
+            with transaction.atomic():
+                user, created = User.objects.get_or_create(username=username)
+
+                if created or reset:
+                    user.set_password(password)
+                    user.email = email
+                    user.is_staff = True
+                    user.is_superuser = True
+                    user.save()
+
+                if not created and not reset and not user.is_superuser:
+                    raise CommandError(
+                        f"[ensure_superuser] existing user '{username}' is not a superuser; "
+                        f"refusing to grant admin group. Use --reset to promote/update."
+                    )
+
+                user.groups.add(admin)  # idempotent
         except OperationalError as exc:
             raise CommandError(f"[ensure_superuser] DB error: {exc}")
-
-        if created or reset:
-            user.set_password(password)
-            user.email = email
-            user.is_staff = True
-            user.is_superuser = True
-            user.save()
-
-        if not created and not reset and not user.is_superuser:
-            raise CommandError(
-                f"[ensure_superuser] existing user '{username}' is not a superuser; "
-                f"refusing to grant admin group. Use --reset to promote/update."
-            )
-
-        user.groups.add(admin)  # idempotent
 
         action = "created" if created else "already exists"
         self.stdout.write(self.style.SUCCESS(

@@ -334,6 +334,43 @@ class TestEnsureSuperuserCommand:
         assert "[ensure_superuser]" in text
         assert "SKIP" in text
 
+    # --- R4-001: atomic rollback on post-create save failure ---
+
+    def test_db_error_on_save_rolls_back_created_user(self, monkeypatch):
+        """OperationalError during user.save() after creation rolls back the
+        entire mutation so no partial ordinary user remains.
+
+        R4-001 regression: if get_or_create succeeds but the subsequent
+        user.save() raises OperationalError, the atomic transaction must
+        undo the INSERT so the next startup does NOT fail closed on a
+        stranded ordinary user under the configured username.
+        """
+        monkeypatch.setenv("DJANGO_SUPERUSER_USERNAME", "rollbackuser")
+        monkeypatch.setenv("DJANGO_SUPERUSER_PASSWORD", "pw")
+        monkeypatch.setenv("DJANGO_SUPERUSER_EMAIL", "rollback@test.com")
+
+        original_save = User.save
+        counter = [0]
+
+        def fake_save(self, *args, **kwargs):
+            counter[0] += 1
+            if counter[0] == 1:
+                # First call: from get_or_create's internal create() — pass through
+                return original_save(self, *args, **kwargs)
+            # Second call: our explicit user.save() — simulate DB failure
+            raise OperationalError("simulated db down on save")
+
+        with mock.patch.object(User, "save", fake_save):
+            with pytest.raises(CommandError, match=r"\[ensure_superuser\]"):
+                call_command("ensure_superuser", stdout=io.StringIO())
+
+        # R4-001 core assertion: no partial user remains
+        assert not User.objects.filter(username="rollbackuser").exists(), (
+            "OperationalError during user.save() must roll back the newly "
+            "created user to prevent a partial ordinary user from blocking "
+            "the next startup."
+        )
+
     def test_invalid_email_raises_command_error(self, monkeypatch):
         """Malformed email → CommandError with "email" in the message.
 
