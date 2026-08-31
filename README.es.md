@@ -227,6 +227,10 @@ docker exec accessledger_web python manage.py bootstrap_roles
 docker exec accessledger_web python manage.py ensure_superuser
 
 # 5. (Opcional) Cargar datos de demostración
+#    En producción (DEBUG=False) hay que definir SEED_DEMO=true en el
+#    entorno para habilitarlo; el comando rechaza ejecutarse de otra
+#    forma y genera contraseñas aleatorias de 20 caracteres impresas
+#    en stdout.
 docker exec accessledger_web python manage.py seed_data
 
 # 6. Abrir el navegador
@@ -276,6 +280,28 @@ POSTGRES_PORT=5432
 
 > [!NOTE]
 > `POSTGRES_HOST_PORT` solo sirve para conectarse desde la máquina host hacia Docker, por ejemplo `localhost:5434`. Los contenedores deben conectarse a PostgreSQL mediante `db:5432`.
+
+---
+
+## ☁️ Base de datos en producción (Render + Neon)
+
+> [!CAUTION]
+> **La PostgreSQL gratuita de Render expira a los ~30 días y se elimina automáticamente.** Cuando ocurre, el deploy falla en `migrate` con:
+> `django.db.utils.OperationalError: failed to resolve host 'dpg-...' : Name or service not known`
+> — la `DATABASE_URL` antigua sigue apuntando a la base de datos eliminada. Hay que recrear la base de datos, actualizar la variable de entorno y redesplegar.
+
+Para evitar que el incidente se repita cada mes, usar el **plan gratuito de Neon** (permanente, no es una prueba):
+
+- **Región**: AWS Europa (Fráncfort) — `eu-central-1`, la misma región que el servicio web de Render.
+- **Límites gratuitos**: 0.5 GB de almacenamiento, 100 CU-horas/mes, 5 GB de salida. El compute se suspende tras ~5 minutos de inactividad y se activa con la siguiente petición (unos segundos de arranque en frío en la primera llamada).
+- **Cadena de conexión** (desde el dashboard de Neon):
+
+```env
+DATABASE_URL=postgres://usuario:password@ep-<proyecto>-<rama>.eu-central-1.aws.neon.tech/accessledger?sslmode=require
+```
+
+- El proyecto ya fuerza `sslmode=require` y un timeout de conexión de 10 segundos en `accessledger/settings.py`, así que la URL anterior funciona sin cambios.
+- Definir `DATABASE_URL` en el servicio de Render y **eliminar cualquier `POSTGRES_HOST` / `POSTGRES_*` manual** para que solo exista una fuente de verdad.
 
 ---
 

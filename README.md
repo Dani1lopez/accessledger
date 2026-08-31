@@ -227,6 +227,9 @@ docker exec accessledger_web python manage.py bootstrap_roles
 docker exec accessledger_web python manage.py ensure_superuser
 
 # 5. (Optional) Load demo data
+#    In production (DEBUG=False) you MUST set SEED_DEMO=true in the
+#    environment to opt in; the command refuses to run otherwise and
+#    generates random 20-char passwords printed to stdout.
 docker exec accessledger_web python manage.py seed_data
 
 # 6. Open your browser
@@ -276,6 +279,28 @@ POSTGRES_PORT=5432
 
 > [!NOTE]
 > `POSTGRES_HOST_PORT` is only for connecting from your host machine to Docker, for example `localhost:5434`. Containers should connect to PostgreSQL through `db:5432`.
+
+---
+
+## ☁️ Production Database (Render + Neon)
+
+> [!CAUTION]
+> **Render's free-tier PostgreSQL expires after ~30 days and is deleted automatically.** When that happens, deploys fail at `migrate` with:
+> `django.db.utils.OperationalError: failed to resolve host 'dpg-...' : Name or service not known`
+> — the old `DATABASE_URL` keeps pointing at the deleted database. Recreate the database, update the environment variable, and redeploy.
+
+To avoid this recurring incident, use **Neon's free plan** instead (permanent, not a trial):
+
+- **Region**: AWS Europe (Frankfurt) — `eu-central-1`, the same region as the Render web service.
+- **Free limits**: 0.5 GB storage, 100 CU-hours/month, 5 GB egress. Compute suspends after ~5 minutes of inactivity and wakes on the next request (a few seconds of cold start on the first hit).
+- **Connection string** (from the Neon dashboard):
+
+```env
+DATABASE_URL=postgres://user:password@ep-<project>-<branch>.eu-central-1.aws.neon.tech/accessledger?sslmode=require
+```
+
+- The project already forces `sslmode=require` and a 10-second connect timeout in `accessledger/settings.py`, so the URL above works as-is.
+- Set `DATABASE_URL` in the Render service and **remove any manual `POSTGRES_HOST` / `POSTGRES_*` values** so there is only one source of truth.
 
 ---
 
