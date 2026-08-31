@@ -7,6 +7,7 @@ from django.views.decorators.http import require_POST
 from core.decorators import admin_required
 from core.forms import AccessGrantForm, ResourceForm, UserForm, UserCreateForm
 from core.permissions import user_can_modify_resource
+from core.utils.snapshots import resource_snapshot, grant_snapshot, user_role
 from .models import AccessGrant, Resource, Profile, AuditLog
 from django.contrib.auth.models import User, Group
 from django.contrib.auth.views import PasswordChangeView
@@ -85,7 +86,7 @@ def resource_create(request):
                 action=AuditLog.Action.RESOURCE_CREATED,
                 obj=resource,
                 before=None,
-                after={"name": resource.name, "resource_type": resource.resource_type},
+                after=resource_snapshot(resource),
             )
             return (
                 JsonResponse({"success": True})
@@ -109,13 +110,7 @@ def resource_update(request, pk):
     resource = get_object_or_404(Resource, pk=pk)
     if not user_can_modify_resource(request.user, resource):
         raise PermissionDenied
-    before = {
-        "name": resource.name,
-        "resource_type": resource.resource_type,
-        "environment": resource.environment,
-        "url": resource.url,
-        "is_active": resource.is_active,
-    }
+    before = resource_snapshot(resource)
     if request.method == "POST":
         form = ResourceForm(request.POST, instance=resource)
         if form.is_valid():
@@ -126,13 +121,7 @@ def resource_update(request, pk):
                 action=AuditLog.Action.RESOURCE_UPDATED,
                 obj=resource,
                 before=before,
-                after={
-                    "name": resource.name,
-                    "resource_type": resource.resource_type,
-                    "environment": resource.environment,
-                    "url": resource.url,
-                    "is_active": resource.is_active,
-                },
+                after=resource_snapshot(resource),
             )
             return (
                 JsonResponse({"success": True})
@@ -156,15 +145,7 @@ def resource_data(request, pk):
     resource = get_object_or_404(Resource, pk=pk)
     if not user_can_modify_resource(request.user, resource):
         raise PermissionDenied
-    return JsonResponse(
-        {
-            "name": resource.name,
-            "resource_type": resource.resource_type,
-            "environment": resource.environment,
-            "url": resource.url,
-            "is_active": resource.is_active,
-        }
-    )
+    return JsonResponse(resource_snapshot(resource))
 
 
 @login_required
@@ -175,13 +156,7 @@ def resource_delete(request, pk):
     if not user_can_modify_resource(request.user, resource):
         raise PermissionDenied
     if request.method == "POST":
-        before = {
-            "name": resource.name,
-            "resource_type": resource.resource_type,
-            "environment": resource.environment,
-            "url": resource.url,
-            "is_active": resource.is_active,
-        }
+        before = resource_snapshot(resource)
         log_action(
             user=request.user,
             action=AuditLog.Action.RESOURCE_DELETED,
