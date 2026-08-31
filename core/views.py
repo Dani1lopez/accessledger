@@ -388,7 +388,7 @@ def user_create(request):
                     "email": user.email,
                     "first_name": user.first_name,
                     "last_name": user.last_name,
-                    "role": user.groups.first().name,
+                    "role": user.groups.first().name if user.groups.exists() else None,
                 },
             )
             return JsonResponse({"success": True})
