@@ -121,7 +121,7 @@ def resource_detail(request, pk):
 @permission_required("core.add_resource", raise_exception=True)
 @require_POST
 def resource_create(request):
-    is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+    is_ajax = _is_ajax(request)
 
     if request.method == "POST":
         form = ResourceForm(request.POST)
@@ -154,7 +154,7 @@ def resource_create(request):
 @login_required
 @permission_required("core.change_resource", raise_exception=True)
 def resource_update(request, pk):
-    is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+    is_ajax = _is_ajax(request)
     resource = get_object_or_404(Resource, pk=pk)
     if not user_can_modify_resource(request.user, resource):
         raise PermissionDenied
@@ -213,7 +213,7 @@ def resource_delete(request, pk):
             after=None,
         )
         resource.delete()
-        is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+        is_ajax = _is_ajax(request)
         return JsonResponse({"success": True}) if is_ajax else redirect("resource_list")
     else:
         return render(request, "core/resource_delete.html", {"resource": resource})
@@ -222,7 +222,7 @@ def resource_delete(request, pk):
 @login_required
 @permission_required("core.can_grant_access", raise_exception=True)
 def grant_create(request, resource_pk):
-    is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+    is_ajax = _is_ajax(request)
     resource = get_object_or_404(Resource, pk=resource_pk)
     if request.method == "POST":
         form = AccessGrantForm(request.POST)
@@ -367,7 +367,7 @@ def user_toggle_active(request, pk):
 @login_required
 @admin_required
 def user_create(request):
-    is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+    is_ajax = _is_ajax(request)
     if request.method == "POST":
         form = UserCreateForm(request.POST)
         if form.is_valid():
@@ -420,7 +420,7 @@ def user_data(request, pk):
 @login_required
 @admin_required
 def user_update(request, pk):
-    is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+    is_ajax = _is_ajax(request)
     user = get_object_or_404(User, pk=pk)
     before = {
         "username": user.username,
