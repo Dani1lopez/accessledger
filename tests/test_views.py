@@ -90,6 +90,14 @@ class TestResourceListView:
 
 @pytest.mark.django_db
 class TestResourceCreateView:
+    def test_get_returns_405(self, editor_client):
+        """REQ-AR-012 Scenario 12.4 — GET on resource_create returns 405."""
+        response = editor_client.get(
+            "/resources/create/",
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        assert response.status_code == 405
+
     def test_viewer_cannot_create(self, viewer_client):
         response = viewer_client.post(
             "/resources/create/",
@@ -113,6 +121,18 @@ class TestResourceCreateView:
 
 @pytest.mark.django_db
 class TestResourceDeleteView:
+    def test_get_returns_405(self, admin_client):
+        """REQ-AR-012 Scenario 12.4 — GET on resource_delete returns 405."""
+        resource = Resource.objects.create(
+            name="test-405-del",
+            resource_type="server",
+        )
+        response = admin_client.get(
+            f"/resources/{resource.pk}/delete/",
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        assert response.status_code == 405
+
     def test_editor_cannot_delete(self, editor_client):
         resource = Resource.objects.create(
             name="test-user",

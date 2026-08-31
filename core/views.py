@@ -70,6 +70,7 @@ def resource_detail(request, pk):
 
 @login_required
 @permission_required("core.add_resource", raise_exception=True)
+@require_POST
 def resource_create(request):
     is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
 
@@ -168,6 +169,7 @@ def resource_data(request, pk):
 
 @login_required
 @permission_required("core.delete_resource", raise_exception=True)
+@require_POST
 def resource_delete(request, pk):
     resource = get_object_or_404(Resource, pk=pk)
     if not user_can_modify_resource(request.user, resource):
