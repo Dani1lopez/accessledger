@@ -1,7 +1,10 @@
+from contextlib import contextmanager
+
 from django.shortcuts import redirect, render, get_object_or_404
 from django.contrib.auth.decorators import permission_required, login_required
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
+from django.db import transaction
 from django.http import JsonResponse, HttpResponseNotAllowed
 from django.views.decorators.http import require_POST
 from core.decorators import admin_required
@@ -26,6 +29,51 @@ def _paginate(request, qs):
     paginator = Paginator(qs, PAGE_SIZE)
     page_obj = paginator.get_page(request.GET.get("page"))
     return page_obj, paginator
+
+
+def _is_ajax(request) -> bool:
+    """Return True if the request was issued via XHR.
+
+    Wraps the X-Requested-With check that was inlined at 6 view sites
+    (74, 107, 191, 200, 369, 422). Single source of truth for the
+    'is this an AJAX call?' question.
+    """
+    return request.headers.get("X-Requested-With") == "XMLHttpRequest"
+
+
+def _snapshot_for(obj) -> dict | None:
+    """Return the right snapshot dict for ``obj``, or None for unknown types."""
+    if isinstance(obj, Resource):
+        return resource_snapshot(obj)
+    if isinstance(obj, AccessGrant):
+        return grant_snapshot(obj)
+    return None
+
+
+@contextmanager
+def _audit(action, *, user, obj, before=None):
+    """Context manager that emits an ``AuditLog`` row on successful exit.
+
+    On exception the atomic block rolls back and no log row is written.
+    The view keeps its explicit ``form.save()`` + ``user.save()`` lines
+    inside the block, so the audit row only lands when the mutation
+    fully commits. The ``after`` snapshot uses ``_snapshot_for(obj)``
+    so each call site stays type-driven.
+
+    Usage:
+        with _audit(action=AuditLog.Action.USER_UPDATED,
+                    user=request.user, obj=user, before=before):
+            user.save()
+    """
+    with transaction.atomic():
+        yield
+        log_action(
+            user=user,
+            action=action,
+            obj=obj,
+            before=before,
+            after=_snapshot_for(obj),
+        )
 
 
 @login_required
