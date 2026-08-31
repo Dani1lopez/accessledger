@@ -344,22 +344,23 @@ def user_management(request):
 @admin_required
 def user_toggle_active(request, pk):
     if request.method == "POST":
-        user = get_object_or_404(User, pk=pk)
-        was_active = user.is_active
-        user.is_active = not user.is_active
-        user.save()
-        action = (
-            AuditLog.Action.USER_ACTIVATED
-            if not was_active
-            else AuditLog.Action.USER_DEACTIVATED
-        )
-        log_action(
-            user=request.user,
-            obj=user,
-            action=action,
-            before={"is_active": was_active},
-            after={"is_active": user.is_active},
-        )
+        with transaction.atomic():
+            user = User.objects.select_for_update().get(pk=pk)
+            was_active = user.is_active
+            user.is_active = not user.is_active
+            user.save()
+            action = (
+                AuditLog.Action.USER_ACTIVATED
+                if not was_active
+                else AuditLog.Action.USER_DEACTIVATED
+            )
+            log_action(
+                user=request.user,
+                obj=user,
+                action=action,
+                before={"is_active": was_active},
+                after={"is_active": user.is_active},
+            )
         return JsonResponse({"success": True})
     else:
         return JsonResponse({"success": False}, status=405)
