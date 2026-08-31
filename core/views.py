@@ -263,18 +263,19 @@ def grant_create(request, resource_pk):
 @permission_required("core.can_revoke_access", raise_exception=True)
 @require_POST
 def grant_revoke(request, pk):
-    grant = get_object_or_404(AccessGrant, pk=pk)
-    before = grant_snapshot(grant)
-    grant.status = AccessGrant.Status.REVOKED
-    grant.save()
-    after = grant_snapshot(grant)
-    log_action(
-        user=request.user,
-        action=AuditLog.Action.GRANT_REVOKED,
-        obj=grant,
-        before=before,
-        after=after,
-    )
+    with transaction.atomic():
+        grant = AccessGrant.objects.select_for_update().get(pk=pk)
+        before = grant_snapshot(grant)
+        grant.status = AccessGrant.Status.REVOKED
+        grant.save()
+        after = grant_snapshot(grant)
+        log_action(
+            user=request.user,
+            action=AuditLog.Action.GRANT_REVOKED,
+            obj=grant,
+            before=before,
+            after=after,
+        )
     return redirect("resource_detail", pk=grant.resource.pk)
 
 
