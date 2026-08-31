@@ -45,14 +45,34 @@ class Command(BaseCommand):
                 "Default behavior is idempotent: existing credentials are preserved."
             ),
         )
+        parser.add_argument(
+            "--require-env",
+            action="store_true",
+            help=(
+                "Force fail-closed when DJANGO_SUPERUSER_USERNAME/PASSWORD "
+                "are missing, even in dev (DEBUG=True). Otherwise the command "
+                "emits WARNING + exit 0 in dev for convenience."
+            ),
+        )
 
     def handle(self, *args, **options):
+        from django.conf import settings
         username = os.environ.get("DJANGO_SUPERUSER_USERNAME")
         password = os.environ.get("DJANGO_SUPERUSER_PASSWORD")
         email = os.environ.get("DJANGO_SUPERUSER_EMAIL", "")
         reset = options.get("reset", False)
+        require_env = options.get("require_env", False)
 
         if not username or not password:
+            # REQ-AR-007 — fail-closed in production (or under --require-env).
+            if not settings.DEBUG or require_env:
+                raise CommandError(
+                    "[ensure_superuser] DJANGO_SUPERUSER_USERNAME/PASSWORD "
+                    "are required (DEBUG={}, --require-env={}).".format(
+                        settings.DEBUG, require_env
+                    )
+                )
+            # Dev convenience: warn and skip.
             self.stdout.write(self.style.WARNING(
                 "[ensure_superuser] SKIP: DJANGO_SUPERUSER_USERNAME/PASSWORD not set"
             ))
