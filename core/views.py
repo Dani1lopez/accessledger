@@ -389,7 +389,7 @@ def user_create(request):
                     "email": user.email,
                     "first_name": user.first_name,
                     "last_name": user.last_name,
-                    "role": user.groups.first().name if user.groups.exists() else None,
+                    "role": user_role(user),
                 },
             )
             return JsonResponse({"success": True})
@@ -427,7 +427,7 @@ def user_update(request, pk):
         "email": user.email,
         "first_name": user.first_name,
         "last_name": user.last_name,
-        "role": user.groups.first().name if user.groups.exists() else None,
+        "role": user_role(user),
     }
     if request.method == "POST":
         form = UserForm(request.POST, instance=user)
@@ -455,7 +455,7 @@ def user_update(request, pk):
                     "email": user.email,
                     "first_name": user.first_name,
                     "last_name": user.last_name,
-                    "role": user.groups.first().name if user.groups.exists() else None,
+                    "role": user_role(user),
                 },
             )
             return JsonResponse({"success": True})
