@@ -471,12 +471,10 @@ def user_update(request, pk):
                 password = form.cleaned_data.get("password")
                 if password:
                     user.set_password(password)
-                    # Force the user to change this admin-set password on next login.
-                    profile, _ = Profile.objects.get_or_create(
-                        user=user, defaults={"must_change_password": True}
-                    )
-                    profile.must_change_password = True
-                    profile.save()
+                    # REQ-AR-012 Scenario 12.7 — defensive helper preserves
+                    # the get_or_create semantics for users with a missing Profile.
+                    from core.utils.profile import _ensure_must_change_profile
+                    _ensure_must_change_profile(user)
                 user.save()
                 log_action(
                     user=request.user,
