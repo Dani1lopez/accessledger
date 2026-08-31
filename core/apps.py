@@ -6,4 +6,6 @@ class CoreConfig(AppConfig):
     name = "core"
 
     def ready(self):
-        import core.signals
+        import core.signals  # noqa: F401
+        # REQ-AR-007 — register the @register(deploy=True) custom check.
+        import accessledger.checks  # noqa: F401
