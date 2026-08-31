@@ -1,0 +1,1 @@
+"""Utils package — pure helpers, no DB queries at import time."""
