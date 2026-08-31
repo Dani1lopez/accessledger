@@ -2,7 +2,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.management.base import BaseCommand
 from django.contrib.auth.models import Group, Permission
 from core.models import Resource, AccessGrant
-from core.permissions.constants import ADMIN_GROUP_PERMISSIONS
+from core.permissions._bootstrap import seed_admin_permissions
 
 class Command(BaseCommand):
     help = "Bootstrap Roles"
@@ -15,13 +15,13 @@ class Command(BaseCommand):
             perm = Permission.objects.get(content_type=ct, codename=codename)
             if not group.permissions.filter(content_type=ct, codename=codename).exists():
                 group.permissions.add(perm)
-                self.stdout.write(f"✅ Asignado {codename} a {group.name}")
+                self.stdout.write(f"OK Asignado {codename} a {group.name}")
 
         def ensure_custom_perm(group: Group, codename: str) -> None:
             perm = Permission.objects.get(codename=codename)
             if not group.permissions.filter(codename=codename).exists():
                 group.permissions.add(perm)
-                self.stdout.write(f"✅ Asignado {codename} a {group.name}")
+                self.stdout.write(f"OK Asignado {codename} a {group.name}")
 
         viewer, viewer_created = Group.objects.get_or_create(name="viewer")
         self.stdout.write(f"viewer creado ahora? {viewer_created}")
@@ -32,16 +32,9 @@ class Command(BaseCommand):
         admin, admin_created = Group.objects.get_or_create(name="admin")
         self.stdout.write(f"admin creado ahora? {admin_created}")
 
-        # Admin: seed the six RBAC codenames from the shared constant.
-        # Resource ones need a ContentType lookup; the two custom ones (no
-        # ContentType) are looked up by codename alone.
-        for codename in ADMIN_GROUP_PERMISSIONS:
-            try:
-                ct = ContentType.objects.get_for_model(Resource)
-                perm = Permission.objects.get(content_type=ct, codename=codename)
-                ensure_perm(admin, Resource, codename)
-            except Permission.DoesNotExist:
-                ensure_custom_perm(admin, codename)
+        # Admin: delegate to the shared seed_admin_permissions helper so
+        # bootstrap_roles and ensure_superuser stay in sync (REQ-AR-006 6.3).
+        seed_admin_permissions(admin, stdout=self.stdout)
 
         for codename in ("view_accessgrant", "add_accessgrant", "change_accessgrant", "delete_accessgrant"):
             ensure_perm(admin, AccessGrant, codename)
