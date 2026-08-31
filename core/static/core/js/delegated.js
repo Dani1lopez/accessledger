@@ -589,6 +589,9 @@
         if (dlg) dlg.close();
         location.reload();
       },
+      onCsrfExpired: function () {
+        if (errBox) { errBox.textContent = 'Sesi\u00f3n expirada, recarga la p\u00e1gina.'; errBox.style.display = 'block'; }
+      },
       onError: function (errors, status) {
         if (status && status !== 400) {
           if (errBox) { errBox.textContent = 'Error del servidor (' + status + '). Int\u00e9ntalo de nuevo.'; errBox.style.display = 'block'; }
@@ -615,8 +618,21 @@
     var init = { method: 'POST', headers: headers };
     if (opts.body) init.body = opts.body;
 
+    // r.json() must NOT be called before checking r.status === 403:
+    // Django returns an HTML body for CSRF failures, which throws
+    // SyntaxError when parsed as JSON. We branch on 403 first and
+    // surface a localized "Sesión expirada, recarga la página."
+    // message via the standard errBox UX (REQ-AR-008 Scenario 8.1).
     fetch(opts.url, init)
       .then(function (r) {
+        if (r.status === 403) {
+          if (typeof opts.onCsrfExpired === 'function') {
+            opts.onCsrfExpired();
+          } else {
+            opts.onError({ csrf_expired: ['Sesión expirada, recarga la página.'] }, 403);
+          }
+          throw new Error('abort');
+        }
         if (!r.ok && r.status !== 400) {
           opts.onError(null, r.status);
           throw new Error('abort');
