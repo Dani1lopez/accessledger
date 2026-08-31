@@ -434,32 +434,33 @@ def user_update(request, pk):
     if request.method == "POST":
         form = UserForm(request.POST, instance=user)
         if form.is_valid():
-            user = form.save(commit=False)
-            user.groups.clear()
-            user.groups.add(form.cleaned_data["role"])
-            password = form.cleaned_data.get("password")
-            if password:
-                user.set_password(password)
-                # Force the user to change this admin-set password on next login.
-                profile, _ = Profile.objects.get_or_create(
-                    user=user, defaults={"must_change_password": True}
+            with transaction.atomic():
+                user = form.save(commit=False)
+                user.groups.clear()
+                user.groups.add(form.cleaned_data["role"])
+                password = form.cleaned_data.get("password")
+                if password:
+                    user.set_password(password)
+                    # Force the user to change this admin-set password on next login.
+                    profile, _ = Profile.objects.get_or_create(
+                        user=user, defaults={"must_change_password": True}
+                    )
+                    profile.must_change_password = True
+                    profile.save()
+                user.save()
+                log_action(
+                    user=request.user,
+                    obj=user,
+                    action=AuditLog.Action.USER_UPDATED,
+                    before=before,
+                    after={
+                        "username": user.username,
+                        "email": user.email,
+                        "first_name": user.first_name,
+                        "last_name": user.last_name,
+                        "role": user_role(user),
+                    },
                 )
-                profile.must_change_password = True
-                profile.save()
-            user.save()
-            log_action(
-                user=request.user,
-                obj=user,
-                action=AuditLog.Action.USER_UPDATED,
-                before=before,
-                after={
-                    "username": user.username,
-                    "email": user.email,
-                    "first_name": user.first_name,
-                    "last_name": user.last_name,
-                    "role": user_role(user),
-                },
-            )
             return JsonResponse({"success": True})
         elif is_ajax:
             return JsonResponse({"success": False, "errors": form.errors})
