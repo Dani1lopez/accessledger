@@ -344,7 +344,37 @@ def user_management(request):
 @admin_required
 def user_toggle_active(request, pk):
     if request.method == "POST":
+        # REQ-AR-011 — guards run BEFORE the atomic block opens so a
+        # rejected request does not acquire a row lock.
+        target = get_object_or_404(User, pk=pk)
+        if request.user.pk == target.pk:
+            return JsonResponse(
+                {
+                    "success": False,
+                    "errors": {
+                        "__all__": ["No puedes desactivarte a ti mismo."],
+                    },
+                },
+                status=400,
+            )
+        if target.is_superuser and not User.objects.filter(
+            is_superuser=True, is_active=True
+        ).exclude(pk=target.pk).exists():
+            return JsonResponse(
+                {
+                    "success": False,
+                    "errors": {
+                        "__all__": [
+                            "No se puede desactivar al último superusuario activo.",
+                        ],
+                    },
+                },
+                status=400,
+            )
+
         with transaction.atomic():
+            # Reload inside the atomic block so the row lock is taken on
+            # the freshest version of the user.
             user = User.objects.select_for_update().get(pk=pk)
             was_active = user.is_active
             user.is_active = not user.is_active
