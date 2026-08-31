@@ -188,15 +188,7 @@ def grant_create(request, resource_pk):
                 action=AuditLog.Action.GRANT_CREATED,
                 obj=grant,
                 before=None,
-                after={
-                    "user": grant.user.username,
-                    "resource": grant.resource.name,
-                    "access_level": grant.access_level,
-                    "status": grant.status,
-                    "start_at": grant.start_at.isoformat(),
-                    "end_at": grant.end_at.isoformat(),
-                    "notes": grant.notes,
-                },
+                after=grant_snapshot(grant),
             )
             return (
                 JsonResponse({"success": True})
@@ -224,26 +216,10 @@ def grant_create(request, resource_pk):
 @require_POST
 def grant_revoke(request, pk):
     grant = get_object_or_404(AccessGrant, pk=pk)
-    before = {
-        "user": grant.user.username,
-        "resource": grant.resource.name,
-        "access_level": grant.access_level,
-        "status": grant.status,
-        "start_at": grant.start_at.isoformat(),
-        "end_at": grant.end_at.isoformat() if grant.end_at else None,
-        "notes": grant.notes,
-    }
+    before = grant_snapshot(grant)
     grant.status = AccessGrant.Status.REVOKED
     grant.save()
-    after = {
-        "user": grant.user.username,
-        "resource": grant.resource.name,
-        "access_level": grant.access_level,
-        "status": grant.status,
-        "start_at": grant.start_at.isoformat(),
-        "end_at": grant.end_at.isoformat() if grant.end_at else None,
-        "notes": grant.notes,
-    }
+    after = grant_snapshot(grant)
     log_action(
         user=request.user,
         action=AuditLog.Action.GRANT_REVOKED,
