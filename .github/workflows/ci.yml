@@ -38,4 +38,7 @@ jobs:
           POSTGRES_DB: accessledger
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-        run: pytest
+        run: |
+          # REQ-AR-003 Scenario 3.5 — full suite on Postgres exercises the
+          # select_for_update() concurrency path (tests/test_concurrency.py).
+          pytest --strict-markers
