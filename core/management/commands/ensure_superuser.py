@@ -21,14 +21,12 @@ Decision (a'): admin-group permissions are seeded from the shared
 """
 import os
 
-from django.contrib.auth.models import Group, Permission, User
-from django.contrib.contenttypes.models import ContentType
+from django.contrib.auth.models import Group, User
 from django.core.management.base import BaseCommand, CommandError
 from django.core.validators import EmailValidator, ValidationError
 from django.db import OperationalError, transaction
 
-from core.models import Resource
-from core.permissions.constants import ADMIN_GROUP_PERMISSIONS
+from core.permissions._bootstrap import seed_admin_permissions
 
 
 class Command(BaseCommand):
@@ -66,25 +64,14 @@ class Command(BaseCommand):
             except ValidationError as exc:
                 raise CommandError(f"[ensure_superuser] invalid email: {exc}")
 
-        admin, _ = Group.objects.get_or_create(name="admin")
-        # Seed admin permissions from the shared constant (decision a'):
-        # compose with bootstrap_roles via shared source of truth.
-        for codename in ADMIN_GROUP_PERMISSIONS:
-            try:
-                ct = ContentType.objects.get_for_model(Resource)
-                perm = Permission.objects.get(content_type=ct, codename=codename)
-            except Permission.DoesNotExist:
-                # Custom permission (can_grant_access / can_revoke_access) has
-                # no ContentType binding — look up by codename only.
-                try:
-                    perm = Permission.objects.get(codename=codename)
-                except Permission.DoesNotExist:
-                    # Codename not registered yet — skip without failing.
-                    continue
-            admin.permissions.add(perm)
-
         try:
             with transaction.atomic():
+                # Group + permissions seeding now lives INSIDE the atomic
+                # block so a mid-transaction failure leaves no admin group
+                # with partial permissions (REQ-AR-003 Scenario 3.4).
+                admin, _ = Group.objects.get_or_create(name="admin")
+                seed_admin_permissions(admin)
+
                 user, created = User.objects.get_or_create(username=username)
 
                 if created or reset:
