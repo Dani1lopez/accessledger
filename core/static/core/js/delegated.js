@@ -217,6 +217,21 @@
 
   main.addEventListener('submit', function (e) {
     var form = e.target;
+
+    // XSS-safe confirm: any <form data-confirm="..."> triggers window.confirm
+    // with the (already HTML-escaped, browser-decoded) message from the
+    // data-confirm attribute. confirm() only displays text — it never
+    // evaluates it — so this is safe even when the message embeds a
+    // user-controlled string like a username (closes the same reflected-XSS
+    // class as the password_change_form fix for issue #55).
+    if (form.dataset && typeof form.dataset.confirm === 'string') {
+      if (!window.confirm(form.dataset.confirm)) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+    }
+
     switch (form.id) {
       case 'formNewResource':   e.preventDefault(); onSubmitNewResource(e, form); break;
       case 'formEditResource':  e.preventDefault(); onSubmitEditResource(e, form); break;

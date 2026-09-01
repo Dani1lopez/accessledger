@@ -132,7 +132,8 @@
             {% if perms.core.can_revoke_access %}
               <td>
                 {% if g.status == 'active' %}
-                  <form method="post" action="{% url 'grant_revoke' pk=g.pk %}" style="margin:0;" onsubmit="return confirm('¿Revocar acceso de @{{ g.user.username }}?')">
+                  {# XSS-safe confirm: the username is HTML-escaped by Django inside the data-confirm attribute and consumed by a delegated JS handler that calls confirm() — which only displays text and never evaluates it. Closes the same reflected-XSS class as password_change_form (issue #55). #}
+                  <form method="post" action="{% url 'grant_revoke' pk=g.pk %}" style="margin:0;" data-confirm="¿Revocar acceso de @{{ g.user.username }}?">
                     {% csrf_token %}
                     <button type="submit" style="padding:4px 12px; border:1px solid rgba(255,80,90,.3); border-radius:6px; background:rgba(255,80,90,.1); color:rgba(255,80,90,.85); font-size:12px; cursor:pointer;">
                       Revocar

@@ -6,6 +6,7 @@ const COMMON = [
 ];
 
 const input = document.getElementById("id_new_password1");
+const username = input.dataset.username || "";
 const bars = [
   document.getElementById("bar1"),
   document.getElementById("bar2"),
@@ -33,7 +34,7 @@ input.addEventListener("input", () => {
   const okLength  = val.length >= 8;
   const okNumeric = !/^\d+$/.test(val);
   const okCommon  = !COMMON.includes(val.toLowerCase());
-  const okSimilar = val.length === 0 || !val.toLowerCase().includes(USERNAME.toLowerCase());
+  const okSimilar = username.length === 0 || val.length === 0 || !val.toLowerCase().includes(username.toLowerCase());
 
   setHint(hints.length,  okLength);
   setHint(hints.numeric, okNumeric);
