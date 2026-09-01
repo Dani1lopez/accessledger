@@ -53,7 +53,8 @@ class CustomPasswordChangeForm(PasswordChangeForm):
     """
 
     def __init__(self, user, *args, **kwargs):
-        self.user = user
+        # NOTE: ``self.user`` is set by ``PasswordChangeForm.__init__`` via
+        # ``super().__init__(user, ...)``; no need to assign it again here.
         super().__init__(user, *args, **kwargs)
         if user is not None:
             self.fields["new_password1"].widget.attrs["data-username"] = (
