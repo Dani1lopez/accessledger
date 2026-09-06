@@ -1,12 +1,17 @@
+from contextlib import contextmanager
+
 from django.shortcuts import redirect, render, get_object_or_404
 from django.contrib.auth.decorators import permission_required, login_required
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
+from django.db import transaction
 from django.http import JsonResponse, HttpResponseNotAllowed
 from django.views.decorators.http import require_POST
 from core.decorators import admin_required
 from core.forms import AccessGrantForm, ResourceForm, UserForm, UserCreateForm
 from core.permissions import user_can_modify_resource
+from core.utils.profile import _ensure_must_change_profile
+from core.utils.snapshots import resource_snapshot, grant_snapshot, user_role
 from .models import AccessGrant, Resource, Profile, AuditLog
 from django.contrib.auth.models import User, Group
 from django.contrib.auth.views import PasswordChangeView
@@ -25,6 +30,46 @@ def _paginate(request, qs):
     paginator = Paginator(qs, PAGE_SIZE)
     page_obj = paginator.get_page(request.GET.get("page"))
     return page_obj, paginator
+
+
+def _is_ajax(request) -> bool:
+    """Return True when the request was issued via XHR (X-Requested-With)."""
+    return request.headers.get("X-Requested-With") == "XMLHttpRequest"
+
+
+def _snapshot_for(obj) -> dict | None:
+    """Return the right snapshot dict for ``obj``, or None for unknown types."""
+    if isinstance(obj, Resource):
+        return resource_snapshot(obj)
+    if isinstance(obj, AccessGrant):
+        return grant_snapshot(obj)
+    return None
+
+
+@contextmanager
+def _audit(action, *, user, obj, before=None):
+    """Context manager that emits an ``AuditLog`` row on successful exit.
+
+    On exception the atomic block rolls back and no log row is written.
+    The view keeps its explicit ``form.save()`` + ``user.save()`` lines
+    inside the block, so the audit row only lands when the mutation
+    fully commits. The ``after`` snapshot uses ``_snapshot_for(obj)``
+    so each call site stays type-driven.
+
+    Usage:
+        with _audit(action=AuditLog.Action.USER_UPDATED,
+                    user=request.user, obj=user, before=before):
+            user.save()
+    """
+    with transaction.atomic():
+        yield
+        log_action(
+            user=user,
+            action=action,
+            obj=obj,
+            before=before,
+            after=_snapshot_for(obj),
+        )
 
 
 @login_required
@@ -70,8 +115,9 @@ def resource_detail(request, pk):
 
 @login_required
 @permission_required("core.add_resource", raise_exception=True)
+@require_POST
 def resource_create(request):
-    is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+    is_ajax = _is_ajax(request)
 
     if request.method == "POST":
         form = ResourceForm(request.POST)
@@ -84,7 +130,7 @@ def resource_create(request):
                 action=AuditLog.Action.RESOURCE_CREATED,
                 obj=resource,
                 before=None,
-                after={"name": resource.name, "resource_type": resource.resource_type},
+                after=resource_snapshot(resource),
             )
             return (
                 JsonResponse({"success": True})
@@ -104,17 +150,11 @@ def resource_create(request):
 @login_required
 @permission_required("core.change_resource", raise_exception=True)
 def resource_update(request, pk):
-    is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+    is_ajax = _is_ajax(request)
     resource = get_object_or_404(Resource, pk=pk)
     if not user_can_modify_resource(request.user, resource):
         raise PermissionDenied
-    before = {
-        "name": resource.name,
-        "resource_type": resource.resource_type,
-        "environment": resource.environment,
-        "url": resource.url,
-        "is_active": resource.is_active,
-    }
+    before = resource_snapshot(resource)
     if request.method == "POST":
         form = ResourceForm(request.POST, instance=resource)
         if form.is_valid():
@@ -125,13 +165,7 @@ def resource_update(request, pk):
                 action=AuditLog.Action.RESOURCE_UPDATED,
                 obj=resource,
                 before=before,
-                after={
-                    "name": resource.name,
-                    "resource_type": resource.resource_type,
-                    "environment": resource.environment,
-                    "url": resource.url,
-                    "is_active": resource.is_active,
-                },
+                after=resource_snapshot(resource),
             )
             return (
                 JsonResponse({"success": True})
@@ -155,31 +189,18 @@ def resource_data(request, pk):
     resource = get_object_or_404(Resource, pk=pk)
     if not user_can_modify_resource(request.user, resource):
         raise PermissionDenied
-    return JsonResponse(
-        {
-            "name": resource.name,
-            "resource_type": resource.resource_type,
-            "environment": resource.environment,
-            "url": resource.url,
-            "is_active": resource.is_active,
-        }
-    )
+    return JsonResponse(resource_snapshot(resource))
 
 
 @login_required
 @permission_required("core.delete_resource", raise_exception=True)
+@require_POST
 def resource_delete(request, pk):
     resource = get_object_or_404(Resource, pk=pk)
     if not user_can_modify_resource(request.user, resource):
         raise PermissionDenied
     if request.method == "POST":
-        before = {
-            "name": resource.name,
-            "resource_type": resource.resource_type,
-            "environment": resource.environment,
-            "url": resource.url,
-            "is_active": resource.is_active,
-        }
+        before = resource_snapshot(resource)
         log_action(
             user=request.user,
             action=AuditLog.Action.RESOURCE_DELETED,
@@ -188,7 +209,7 @@ def resource_delete(request, pk):
             after=None,
         )
         resource.delete()
-        is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+        is_ajax = _is_ajax(request)
         return JsonResponse({"success": True}) if is_ajax else redirect("resource_list")
     else:
         return render(request, "core/resource_delete.html", {"resource": resource})
@@ -197,7 +218,7 @@ def resource_delete(request, pk):
 @login_required
 @permission_required("core.can_grant_access", raise_exception=True)
 def grant_create(request, resource_pk):
-    is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+    is_ajax = _is_ajax(request)
     resource = get_object_or_404(Resource, pk=resource_pk)
     if request.method == "POST":
         form = AccessGrantForm(request.POST)
@@ -211,15 +232,7 @@ def grant_create(request, resource_pk):
                 action=AuditLog.Action.GRANT_CREATED,
                 obj=grant,
                 before=None,
-                after={
-                    "user": grant.user.username,
-                    "resource": grant.resource.name,
-                    "access_level": grant.access_level,
-                    "status": grant.status,
-                    "start_at": grant.start_at.isoformat(),
-                    "end_at": grant.end_at.isoformat(),
-                    "notes": grant.notes,
-                },
+                after=grant_snapshot(grant),
             )
             return (
                 JsonResponse({"success": True})
@@ -246,34 +259,19 @@ def grant_create(request, resource_pk):
 @permission_required("core.can_revoke_access", raise_exception=True)
 @require_POST
 def grant_revoke(request, pk):
-    grant = get_object_or_404(AccessGrant, pk=pk)
-    before = {
-        "user": grant.user.username,
-        "resource": grant.resource.name,
-        "access_level": grant.access_level,
-        "status": grant.status,
-        "start_at": grant.start_at.isoformat(),
-        "end_at": grant.end_at.isoformat() if grant.end_at else None,
-        "notes": grant.notes,
-    }
-    grant.status = AccessGrant.Status.REVOKED
-    grant.save()
-    after = {
-        "user": grant.user.username,
-        "resource": grant.resource.name,
-        "access_level": grant.access_level,
-        "status": grant.status,
-        "start_at": grant.start_at.isoformat(),
-        "end_at": grant.end_at.isoformat() if grant.end_at else None,
-        "notes": grant.notes,
-    }
-    log_action(
-        user=request.user,
-        action=AuditLog.Action.GRANT_REVOKED,
-        obj=grant,
-        before=before,
-        after=after,
-    )
+    with transaction.atomic():
+        grant = AccessGrant.objects.select_for_update().get(pk=pk)
+        before = grant_snapshot(grant)
+        grant.status = AccessGrant.Status.REVOKED
+        grant.save()
+        after = grant_snapshot(grant)
+        log_action(
+            user=request.user,
+            action=AuditLog.Action.GRANT_REVOKED,
+            obj=grant,
+            before=before,
+            after=after,
+        )
     return redirect("resource_detail", pk=grant.resource.pk)
 
 
@@ -342,22 +340,51 @@ def user_management(request):
 @admin_required
 def user_toggle_active(request, pk):
     if request.method == "POST":
-        user = get_object_or_404(User, pk=pk)
-        was_active = user.is_active
-        user.is_active = not user.is_active
-        user.save()
-        action = (
-            AuditLog.Action.USER_ACTIVATED
-            if not was_active
-            else AuditLog.Action.USER_DEACTIVATED
-        )
-        log_action(
-            user=request.user,
-            obj=user,
-            action=action,
-            before={"is_active": was_active},
-            after={"is_active": user.is_active},
-        )
+        # REQ-AR-011 — run guards BEFORE the atomic block to avoid a row lock on rejection.
+        target = get_object_or_404(User, pk=pk)
+        if request.user.pk == target.pk:
+            return JsonResponse(
+                {
+                    "success": False,
+                    "errors": {
+                        "__all__": ["No puedes desactivarte a ti mismo."],
+                    },
+                },
+                status=400,
+            )
+        if target.is_superuser and not User.objects.filter(
+            is_superuser=True, is_active=True
+        ).exclude(pk=target.pk).exists():
+            return JsonResponse(
+                {
+                    "success": False,
+                    "errors": {
+                        "__all__": [
+                            "No se puede desactivar al último superusuario activo.",
+                        ],
+                    },
+                },
+                status=400,
+            )
+
+        with transaction.atomic():
+            # Re-fetch under SELECT ... FOR UPDATE so concurrent toggles can't race.
+            user = User.objects.select_for_update().get(pk=pk)
+            was_active = user.is_active
+            user.is_active = not user.is_active
+            user.save()
+            action = (
+                AuditLog.Action.USER_ACTIVATED
+                if not was_active
+                else AuditLog.Action.USER_DEACTIVATED
+            )
+            log_action(
+                user=request.user,
+                obj=user,
+                action=action,
+                before={"is_active": was_active},
+                after={"is_active": user.is_active},
+            )
         return JsonResponse({"success": True})
     else:
         return JsonResponse({"success": False}, status=405)
@@ -366,7 +393,7 @@ def user_toggle_active(request, pk):
 @login_required
 @admin_required
 def user_create(request):
-    is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+    is_ajax = _is_ajax(request)
     if request.method == "POST":
         form = UserCreateForm(request.POST)
         if form.is_valid():
@@ -388,7 +415,7 @@ def user_create(request):
                     "email": user.email,
                     "first_name": user.first_name,
                     "last_name": user.last_name,
-                    "role": user.groups.first().name,
+                    "role": user_role(user),
                 },
             )
             return JsonResponse({"success": True})
@@ -419,44 +446,41 @@ def user_data(request, pk):
 @login_required
 @admin_required
 def user_update(request, pk):
-    is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+    is_ajax = _is_ajax(request)
     user = get_object_or_404(User, pk=pk)
     before = {
         "username": user.username,
         "email": user.email,
         "first_name": user.first_name,
         "last_name": user.last_name,
-        "role": user.groups.first().name if user.groups.exists() else None,
+        "role": user_role(user),
     }
     if request.method == "POST":
         form = UserForm(request.POST, instance=user)
         if form.is_valid():
-            user = form.save(commit=False)
-            user.groups.clear()
-            user.groups.add(form.cleaned_data["role"])
-            password = form.cleaned_data.get("password")
-            if password:
-                user.set_password(password)
-                # Force the user to change this admin-set password on next login.
-                profile, _ = Profile.objects.get_or_create(
-                    user=user, defaults={"must_change_password": True}
+            with transaction.atomic():
+                user = form.save(commit=False)
+                user.groups.clear()
+                user.groups.add(form.cleaned_data["role"])
+                password = form.cleaned_data.get("password")
+                if password:
+                    user.set_password(password)
+                    # REQ-AR-012 §12.7 — defensive helper creates the Profile if missing.
+                    _ensure_must_change_profile(user)
+                user.save()
+                log_action(
+                    user=request.user,
+                    obj=user,
+                    action=AuditLog.Action.USER_UPDATED,
+                    before=before,
+                    after={
+                        "username": user.username,
+                        "email": user.email,
+                        "first_name": user.first_name,
+                        "last_name": user.last_name,
+                        "role": user_role(user),
+                    },
                 )
-                profile.must_change_password = True
-                profile.save()
-            user.save()
-            log_action(
-                user=request.user,
-                obj=user,
-                action=AuditLog.Action.USER_UPDATED,
-                before=before,
-                after={
-                    "username": user.username,
-                    "email": user.email,
-                    "first_name": user.first_name,
-                    "last_name": user.last_name,
-                    "role": user.groups.first().name if user.groups.exists() else None,
-                },
-            )
             return JsonResponse({"success": True})
         elif is_ajax:
             return JsonResponse({"success": False, "errors": form.errors})

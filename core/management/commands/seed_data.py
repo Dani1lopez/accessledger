@@ -1,6 +1,10 @@
-from django.core.management.base import BaseCommand
+import os
+
+from django.conf import settings
+from django.core.management.base import BaseCommand, CommandError
 from django.contrib.auth.models import User, Group
 from django.utils import timezone
+from django.utils.crypto import get_random_string
 from datetime import timedelta
 from core.models import Resource, AccessGrant
 
@@ -9,23 +13,50 @@ class Command(BaseCommand):
     help = "Crea datos de prueba para Resources y AccessGrants"
 
     def handle(self, *args, **options):
+        # REQ-AR-009 — refuse to run when DEBUG=False unless SEED_DEMO=true.
+        if not settings.DEBUG and os.environ.get("SEED_DEMO") != "true":
+            raise CommandError(
+                "seed_data refuses to run when DEBUG=False unless "
+                "SEED_DEMO=true is set in the environment."
+            )
+
         self.stdout.write("seed_data running...")
 
-        viewer1, created = User.objects.get_or_create(username="viewer1")
-        if created:
-            viewer1.set_password("viewer1234!")
+        viewer1, v_created = User.objects.get_or_create(username="viewer1")
+        editor1, e_created = User.objects.get_or_create(username="editor1")
+        admin1, a_created = User.objects.get_or_create(username="admin1")
+
+        # REQ-AR-009 — random 20-char passwords instead of hardcoded ones.
+        # Capture the plaintext BEFORE set_password so we can print it.
+        v_pw = e_pw = a_pw = None
+        if v_created:
+            v_pw = get_random_string(length=20)
+            viewer1.set_password(v_pw)
             viewer1.groups.add(Group.objects.get(name="viewer"))
             viewer1.save()
-        editor1, created = User.objects.get_or_create(username="editor1")
-        if created:
-            editor1.set_password("edit1234!")
+        if e_created:
+            e_pw = get_random_string(length=20)
+            editor1.set_password(e_pw)
             editor1.groups.add(Group.objects.get(name="editor"))
             editor1.save()
-        admin1, created = User.objects.get_or_create(username="admin1")
-        if created:
-            admin1.set_password("admin1234!")
+        if a_created:
+            a_pw = get_random_string(length=20)
+            admin1.set_password(a_pw)
             admin1.groups.add(Group.objects.get(name="admin"))
             admin1.save()
+
+        # Print the generated passwords once under a clear section header
+        # so devs can copy them. Only on first creation.
+        if v_created or e_created or a_created:
+            self.stdout.write(self.style.WARNING(
+                "\nGenerated passwords (copy these now — they are NOT recoverable):"
+            ))
+            if v_pw:
+                self.stdout.write(f"  viewer1: {v_pw}")
+            if e_pw:
+                self.stdout.write(f"  editor1: {e_pw}")
+            if a_pw:
+                self.stdout.write(f"  admin1: {a_pw}")
 
         now = timezone.now()
 

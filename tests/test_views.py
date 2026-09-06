@@ -90,6 +90,14 @@ class TestResourceListView:
 
 @pytest.mark.django_db
 class TestResourceCreateView:
+    def test_get_returns_405(self, editor_client):
+        """REQ-AR-012 Scenario 12.4 — GET on resource_create returns 405."""
+        response = editor_client.get(
+            "/resources/create/",
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        assert response.status_code == 405
+
     def test_viewer_cannot_create(self, viewer_client):
         response = viewer_client.post(
             "/resources/create/",
@@ -113,6 +121,18 @@ class TestResourceCreateView:
 
 @pytest.mark.django_db
 class TestResourceDeleteView:
+    def test_get_returns_405(self, admin_client):
+        """REQ-AR-012 Scenario 12.4 — GET on resource_delete returns 405."""
+        resource = Resource.objects.create(
+            name="test-405-del",
+            resource_type="server",
+        )
+        response = admin_client.get(
+            f"/resources/{resource.pk}/delete/",
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        assert response.status_code == 405
+
     def test_editor_cannot_delete(self, editor_client):
         resource = Resource.objects.create(
             name="test-user",
@@ -761,6 +781,56 @@ class TestUserCreateView:
         data = response.json()
         assert data["success"] is False
         assert "password" in data["errors"]
+
+    def test_user_create_without_role_does_not_crash(self, admin_client):
+        """REQ-AR-001 Scenario 1.2 — user_create MUST NOT raise AttributeError
+        when the target user ends up with no groups (audit role=None).
+
+        Form validation rejects missing role, so the audit-log block at
+        line 391 must not be reached. We assert no 500 / AttributeError.
+        The defensive guard inside the audit block itself is verified by
+        the user_role helper test in PR 2 (tests/test_snapshots.py).
+        """
+        response = admin_client.post(
+            "/users/create/",
+            data={
+                "username": "groupless",
+                "email": "g@test.com",
+                "first_name": "No",
+                "last_name": "Group",
+                "password": "testpass123",
+                # Intentionally no "role" key — form rejects.
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is False
+
+    def test_audit_log_records_role_for_user_create(self, admin_client):
+        """REQ-AR-001 Scenario 1.1 — happy path: audit row stores role=<group>."""
+        group = Group.objects.create(name="audit-role-group")
+        response = admin_client.post(
+            "/users/create/",
+            data={
+                "username": "happy",
+                "email": "h@test.com",
+                "first_name": "Happy",
+                "last_name": "Path",
+                "password": "testpass123",
+                "role": group.pk,
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        assert response.status_code == 200
+        assert response.json()["success"] is True
+
+        created = User.objects.get(username="happy")
+        row = AuditLog.objects.filter(
+            object_id=created.pk, action=AuditLog.Action.USER_CREATED
+        ).first()
+        assert row is not None
+        assert row.after.get("role") == "audit-role-group"
 
 
 @pytest.mark.django_db

@@ -21,14 +21,12 @@ Decision (a'): admin-group permissions are seeded from the shared
 """
 import os
 
-from django.contrib.auth.models import Group, Permission, User
-from django.contrib.contenttypes.models import ContentType
+from django.contrib.auth.models import Group, User
 from django.core.management.base import BaseCommand, CommandError
 from django.core.validators import EmailValidator, ValidationError
 from django.db import OperationalError, transaction
 
-from core.models import Resource
-from core.permissions.constants import ADMIN_GROUP_PERMISSIONS
+from core.permissions._bootstrap import seed_admin_permissions
 
 
 class Command(BaseCommand):
@@ -47,14 +45,34 @@ class Command(BaseCommand):
                 "Default behavior is idempotent: existing credentials are preserved."
             ),
         )
+        parser.add_argument(
+            "--require-env",
+            action="store_true",
+            help=(
+                "Force fail-closed when DJANGO_SUPERUSER_USERNAME/PASSWORD "
+                "are missing, even in dev (DEBUG=True). Otherwise the command "
+                "emits WARNING + exit 0 in dev for convenience."
+            ),
+        )
 
     def handle(self, *args, **options):
+        from django.conf import settings
         username = os.environ.get("DJANGO_SUPERUSER_USERNAME")
         password = os.environ.get("DJANGO_SUPERUSER_PASSWORD")
         email = os.environ.get("DJANGO_SUPERUSER_EMAIL", "")
         reset = options.get("reset", False)
+        require_env = options.get("require_env", False)
 
         if not username or not password:
+            # REQ-AR-007 — fail-closed in production (or under --require-env).
+            if not settings.DEBUG or require_env:
+                raise CommandError(
+                    "[ensure_superuser] DJANGO_SUPERUSER_USERNAME/PASSWORD "
+                    "are required (DEBUG={}, --require-env={}).".format(
+                        settings.DEBUG, require_env
+                    )
+                )
+            # Dev convenience: warn and skip.
             self.stdout.write(self.style.WARNING(
                 "[ensure_superuser] SKIP: DJANGO_SUPERUSER_USERNAME/PASSWORD not set"
             ))
@@ -66,25 +84,14 @@ class Command(BaseCommand):
             except ValidationError as exc:
                 raise CommandError(f"[ensure_superuser] invalid email: {exc}")
 
-        admin, _ = Group.objects.get_or_create(name="admin")
-        # Seed admin permissions from the shared constant (decision a'):
-        # compose with bootstrap_roles via shared source of truth.
-        for codename in ADMIN_GROUP_PERMISSIONS:
-            try:
-                ct = ContentType.objects.get_for_model(Resource)
-                perm = Permission.objects.get(content_type=ct, codename=codename)
-            except Permission.DoesNotExist:
-                # Custom permission (can_grant_access / can_revoke_access) has
-                # no ContentType binding — look up by codename only.
-                try:
-                    perm = Permission.objects.get(codename=codename)
-                except Permission.DoesNotExist:
-                    # Codename not registered yet — skip without failing.
-                    continue
-            admin.permissions.add(perm)
-
         try:
             with transaction.atomic():
+                # Group + permissions seeding now lives INSIDE the atomic
+                # block so a mid-transaction failure leaves no admin group
+                # with partial permissions (REQ-AR-003 Scenario 3.4).
+                admin, _ = Group.objects.get_or_create(name="admin")
+                seed_admin_permissions(admin)
+
                 user, created = User.objects.get_or_create(username=username)
 
                 if created or reset:
