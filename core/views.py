@@ -10,6 +10,7 @@ from django.views.decorators.http import require_POST
 from core.decorators import admin_required
 from core.forms import AccessGrantForm, ResourceForm, UserForm, UserCreateForm
 from core.permissions import user_can_modify_resource
+from core.utils.profile import _ensure_must_change_profile
 from core.utils.snapshots import resource_snapshot, grant_snapshot, user_role
 from .models import AccessGrant, Resource, Profile, AuditLog
 from django.contrib.auth.models import User, Group
@@ -473,7 +474,6 @@ def user_update(request, pk):
                     user.set_password(password)
                     # REQ-AR-012 Scenario 12.7 — defensive helper preserves
                     # the get_or_create semantics for users with a missing Profile.
-                    from core.utils.profile import _ensure_must_change_profile
                     _ensure_must_change_profile(user)
                 user.save()
                 log_action(
