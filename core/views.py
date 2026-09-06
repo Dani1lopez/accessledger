@@ -33,12 +33,7 @@ def _paginate(request, qs):
 
 
 def _is_ajax(request) -> bool:
-    """Return True if the request was issued via XHR.
-
-    Wraps the X-Requested-With check that was inlined at 6 view sites
-    (74, 107, 191, 200, 369, 422). Single source of truth for the
-    'is this an AJAX call?' question.
-    """
+    """Return True when the request was issued via XHR (X-Requested-With)."""
     return request.headers.get("X-Requested-With") == "XMLHttpRequest"
 
 
@@ -345,8 +340,7 @@ def user_management(request):
 @admin_required
 def user_toggle_active(request, pk):
     if request.method == "POST":
-        # REQ-AR-011 — guards run BEFORE the atomic block opens so a
-        # rejected request does not acquire a row lock.
+        # REQ-AR-011 — run guards BEFORE the atomic block to avoid a row lock on rejection.
         target = get_object_or_404(User, pk=pk)
         if request.user.pk == target.pk:
             return JsonResponse(
@@ -374,8 +368,7 @@ def user_toggle_active(request, pk):
             )
 
         with transaction.atomic():
-            # Reload inside the atomic block so the row lock is taken on
-            # the freshest version of the user.
+            # Re-fetch under SELECT ... FOR UPDATE so concurrent toggles can't race.
             user = User.objects.select_for_update().get(pk=pk)
             was_active = user.is_active
             user.is_active = not user.is_active
@@ -472,8 +465,7 @@ def user_update(request, pk):
                 password = form.cleaned_data.get("password")
                 if password:
                     user.set_password(password)
-                    # REQ-AR-012 Scenario 12.7 — defensive helper preserves
-                    # the get_or_create semantics for users with a missing Profile.
+                    # REQ-AR-012 §12.7 — defensive helper creates the Profile if missing.
                     _ensure_must_change_profile(user)
                 user.save()
                 log_action(

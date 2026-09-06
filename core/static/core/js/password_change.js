@@ -6,6 +6,7 @@ const COMMON = [
 ];
 
 const input = document.getElementById("id_new_password1");
+// Cached form ref: input.form re-reads live each access.
 const formEl = input.form;
 const bars = [
   document.getElementById("bar1"),
@@ -34,6 +35,7 @@ input.addEventListener("input", () => {
   const okLength  = val.length >= 8;
   const okNumeric = !/^\d+$/.test(val);
   const okCommon  = !COMMON.includes(val.toLowerCase());
+  // Username comes from data-username attr on the <form> (set by the template).
   const okSimilar = val.length === 0 || !val.toLowerCase().includes(formEl.dataset.username.toLowerCase());
 
   setHint(hints.length,  okLength);
