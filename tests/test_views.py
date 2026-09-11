@@ -1200,6 +1200,56 @@ class TestPasswordChangeAuditLog:
             action="password_changed", user=user
         ).exists()
 
+    def test_password_change_save_failure_keeps_flag_and_no_audit(self, forced_password_client):
+        """REQ-JD-02 Scenario 2.3 — password persistence failure must not clear
+        the forced-change flag, must not write the audit row, and must leave
+        the old password effective.
+
+        Pre-fix, flag+audit commit BEFORE the password save with no
+        transaction, so the user escapes the forced-change flow with a lying
+        audit row. Inject the failure at the model write (User.save) — the
+        persistence point of PasswordChangeForm.save — and assert observable
+        state only. The dedicated client suppresses exception re-raise
+        (Django 5.2 moved raise_request_exception to the constructor).
+        """
+        from unittest.mock import patch
+
+        from django.test import Client as TestClient
+
+        user = User.objects.get(username="forced1")
+
+        # Django 5.2: raise_request_exception is a Client constructor arg.
+        injected_client = TestClient(raise_request_exception=False)
+        assert injected_client.login(username="forced1", password="ForcedPass123!")
+
+        with patch(
+            "django.contrib.auth.models.User.save",
+            side_effect=RuntimeError("injected save failure"),
+        ):
+            response = injected_client.post(
+                "/password/change/",
+                data={
+                    "old_password": "ForcedPass123!",
+                    "new_password1": "Newpass123!",
+                    "new_password2": "Newpass123!",
+                },
+            )
+
+        assert response.status_code == 500
+
+        user.profile.refresh_from_db()
+        assert user.profile.must_change_password is True
+        assert (
+            AuditLog.objects.filter(action="password_changed", user=user).count() == 0
+        )
+        # Old password still effective; new password was never persisted.
+        assert forced_password_client.login(
+            username="forced1", password="ForcedPass123!"
+        )
+        assert not forced_password_client.login(
+            username="forced1", password="Newpass123!"
+        )
+
 
 @pytest.mark.django_db
 class TestCustomPasswordChangeView:
@@ -1233,6 +1283,52 @@ class TestCustomPasswordChangeView:
         )
         assert response.status_code == 302
         assert response.url == "/resources/"
+
+    def test_password_change_with_missing_profile_does_not_crash(self, forced_password_client):
+        """REQ-JD-02 Scenario 2.2 — a missing Profile must be recreated
+        defensively, not crash the view with Profile.DoesNotExist."""
+        user = User.objects.get(username="forced1")
+        user.profile.delete()
+
+        response = forced_password_client.post(
+            "/password/change/",
+            data={
+                "old_password": "ForcedPass123!",
+                "new_password1": "Newpass123!",
+                "new_password2": "Newpass123!",
+            },
+        )
+
+        assert response.status_code == 302
+        profile = Profile.objects.get(user=user)
+        assert profile.must_change_password is False
+        assert (
+            AuditLog.objects.filter(action="password_changed", user=user).count() == 1
+        )
+
+    def test_password_change_success_persists_password_then_flag_then_audit(self, forced_password_client):
+        """REQ-JD-02 Scenario 2.1 — happy path: new password works, flag False,
+        exactly one PASSWORD_CHANGED row."""
+        response = forced_password_client.post(
+            "/password/change/",
+            data={
+                "old_password": "ForcedPass123!",
+                "new_password1": "Newpass123!",
+                "new_password2": "Newpass123!",
+            },
+        )
+
+        assert response.status_code == 302
+        assert response.url == "/resources/"
+        user = User.objects.get(username="forced1")
+        assert forced_password_client.login(
+            username="forced1", password="Newpass123!"
+        )
+        user.profile.refresh_from_db()
+        assert user.profile.must_change_password is False
+        assert (
+            AuditLog.objects.filter(action="password_changed", user=user).count() == 1
+        )
 
 
 # ════════════════════════════════════════════════════════════════════════════════
