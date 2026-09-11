@@ -6,7 +6,7 @@ def log_action(user, action, obj, before=None, after= None):
         action = action,
         object_type = obj.__class__.__name__,
         object_id = obj.pk,
-        object_repr = str(obj),
+        object_repr = str(obj)[:80],
         before = before,
         after = after,
     )

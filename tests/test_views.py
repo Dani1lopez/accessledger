@@ -118,6 +118,32 @@ class TestResourceCreateView:
         )
         assert response.status_code == 200
 
+    def test_editor_can_create_with_120_char_name_writes_truncated_audit_repr(self, editor_client):
+        """REQ-JD-01 Scenario 1.1 — a 120-char name must not overflow object_repr(80).
+
+        Pre-fix: str(obj) is 120 chars, AuditLog.objects.create() raises
+        DataError AFTER the resource INSERT commits → 500 and a resource
+        with no audit row.
+        """
+        response = editor_client.post(
+            "/resources/create/",
+            data={
+                "name": "r" * 120,
+                "resource_type": "server",
+                "environment": "dev",
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        assert response.status_code == 200
+        resource = Resource.objects.get(name="r" * 120)
+        rows = AuditLog.objects.filter(
+            object_type="Resource", object_id=resource.pk
+        )
+        assert rows.count() == 1
+        row = rows.first()
+        assert len(row.object_repr) <= 80
+        assert row.object_repr == resource.name[:80]
+
 
 @pytest.mark.django_db
 class TestResourceDeleteView:
@@ -407,6 +433,32 @@ class TestGrantCreateView:
             HTTP_X_REQUESTED_WITH="XMLHttpRequest",
         )
         assert response.status_code == 200
+
+    def test_admin_can_create_grant_with_long_names_writes_truncated_audit_repr(self, admin_client):
+        """REQ-JD-01 — grant audit repr (user → resource (level)) must fit 80 chars."""
+        resource = Resource.objects.create(
+            name="server-" + "x" * 112,
+            resource_type="server",
+        )
+        target_user = User.objects.create_user(username="u" * 100, password="pass")
+
+        response = admin_client.post(
+            f"/resources/{resource.pk}/grants/create/",
+            data={
+                "user": target_user.pk,
+                "access_level": "read",
+                "start_at": "2026-01-01",
+                "end_at": "2026-07-09",
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        assert response.status_code == 200
+        grant = AccessGrant.objects.get(resource=resource, user=target_user)
+        rows = AuditLog.objects.filter(
+            object_type="AccessGrant", object_id=grant.pk
+        )
+        assert rows.count() == 1
+        assert len(rows.first().object_repr) <= 80
 
 
 @pytest.mark.django_db
