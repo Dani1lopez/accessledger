@@ -257,25 +257,37 @@ class TestEnsureSuperuserCommand:
         monkeypatch.delenv("DJANGO_SUPERUSER_USERNAME", raising=False)
         monkeypatch.setenv("DJANGO_SUPERUSER_PASSWORD", "pw")
         monkeypatch.delenv("DJANGO_SUPERUSER_EMAIL", raising=False)
-        before = User.objects.count()
-        out = io.StringIO()
-        # Must NOT raise
-        call_command("ensure_superuser", stdout=out)
-        after = User.objects.count()
-        assert after == before, "no User should be created when env is missing"
-        assert "SKIP" in out.getvalue()
+        from django.conf import settings as dj_settings
+        original_debug = dj_settings.DEBUG
+        dj_settings.DEBUG = True
+        try:
+            before = User.objects.count()
+            out = io.StringIO()
+            # Must NOT raise
+            call_command("ensure_superuser", stdout=out)
+            after = User.objects.count()
+            assert after == before, "no User should be created when env is missing"
+            assert "SKIP" in out.getvalue()
+        finally:
+            dj_settings.DEBUG = original_debug
 
     def test_missing_password_skips(self, monkeypatch):
         """DJANGO_SUPERUSER_PASSWORD missing → WARNING + no User created."""
         monkeypatch.setenv("DJANGO_SUPERUSER_USERNAME", "admin5")
         monkeypatch.delenv("DJANGO_SUPERUSER_PASSWORD", raising=False)
         monkeypatch.delenv("DJANGO_SUPERUSER_EMAIL", raising=False)
-        before = User.objects.count()
-        out = io.StringIO()
-        call_command("ensure_superuser", stdout=out)
-        after = User.objects.count()
-        assert after == before, "no User should be created when password is missing"
-        assert "SKIP" in out.getvalue()
+        from django.conf import settings as dj_settings
+        original_debug = dj_settings.DEBUG
+        dj_settings.DEBUG = True
+        try:
+            before = User.objects.count()
+            out = io.StringIO()
+            call_command("ensure_superuser", stdout=out)
+            after = User.objects.count()
+            assert after == before, "no User should be created when password is missing"
+            assert "SKIP" in out.getvalue()
+        finally:
+            dj_settings.DEBUG = original_debug
 
     def test_db_error_raises_command_error(self, monkeypatch):
         """OperationalError from the DB → CommandError (fail-closed).
@@ -328,11 +340,17 @@ class TestEnsureSuperuserCommand:
         monkeypatch.delenv("DJANGO_SUPERUSER_USERNAME", raising=False)
         monkeypatch.delenv("DJANGO_SUPERUSER_PASSWORD", raising=False)
         monkeypatch.delenv("DJANGO_SUPERUSER_EMAIL", raising=False)
-        out = io.StringIO()
-        call_command("ensure_superuser", stdout=out)
-        text = out.getvalue()
-        assert "[ensure_superuser]" in text
-        assert "SKIP" in text
+        from django.conf import settings as dj_settings
+        original_debug = dj_settings.DEBUG
+        dj_settings.DEBUG = True
+        try:
+            out = io.StringIO()
+            call_command("ensure_superuser", stdout=out)
+            text = out.getvalue()
+            assert "[ensure_superuser]" in text
+            assert "SKIP" in text
+        finally:
+            dj_settings.DEBUG = original_debug
 
     # --- R4-001: atomic rollback on post-create save failure ---
 

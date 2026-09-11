@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 from pathlib import Path
 import os
 from dotenv import load_dotenv
+from django.core.exceptions import ImproperlyConfigured
 import dj_database_url
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -23,11 +24,24 @@ load_dotenv(BASE_DIR / ".env")
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get("SECRET_KEY")
+# REQ-AR-007 — dict-access raises KeyError at module import if SECRET_KEY
+# is unset. Django surfaces this as ImproperlyConfigured.
+SECRET_KEY = os.environ["SECRET_KEY"]
+if not SECRET_KEY:
+    raise ImproperlyConfigured("SECRET_KEY env var is empty")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get("DEBUG", "False") == "True"
-ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "").split(",")
+
+# REQ-AR-007 — empty ALLOWED_HOSTS is permitted in dev (DEBUG=True) but
+# must raise at startup when DEBUG=False so a misconfigured deploy fails
+# fast instead of serving a 500 from every request.
+_allowed_hosts = os.environ.get("ALLOWED_HOSTS") or ""
+ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts.split(",") if h.strip()]
+if not DEBUG and not ALLOWED_HOSTS:
+    raise ImproperlyConfigured(
+        "ALLOWED_HOSTS env var must be set when DEBUG=False"
+    )
 
 
 # Application definition
