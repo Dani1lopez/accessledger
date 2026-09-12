@@ -301,6 +301,7 @@ DATABASE_URL=postgres://user:password@ep-<project>-<branch>.eu-central-1.aws.neo
 
 - The project already forces `sslmode=require` and a 10-second connect timeout in `accessledger/settings.py`, so the URL above works as-is.
 - Set `DATABASE_URL` in the Render service and **remove any manual `POSTGRES_HOST` / `POSTGRES_*` values** so there is only one source of truth.
+- **Boot resilience**: `entrypoint.sh` probes PostgreSQL with `psycopg` before running `collectstatic`/`migrate`, retrying up to `DB_READY_RETRIES` times (default `30`) with `DB_READY_WAIT` seconds between attempts (default `2`). Transient DNS or connection blips no longer kill the deploy at boot; if the database is still unreachable after all retries, the container exits nonzero instead of starting against a dead database.
 
 ---
 
