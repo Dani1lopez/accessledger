@@ -1,6 +1,7 @@
 from contextlib import contextmanager
 
 from django.shortcuts import redirect, render, get_object_or_404
+from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth.decorators import permission_required, login_required
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
@@ -292,10 +293,18 @@ class CustomPasswordChangeView(PasswordChangeView):
         return context
 
     def form_valid(self, form):
-        self.request.user.profile.must_change_password = False
-        self.request.user.profile.save()
-        log_action(self.request.user, AuditLog.Action.PASSWORD_CHANGED, self.request.user)
-        return super().form_valid(form)
+        # REQ-JD-02 — persist the new password FIRST, then clear the forced-change
+        # flag and write the audit row inside ONE atomic block. A failure anywhere
+        # (password save, profile write, audit) rolls back flag + audit together,
+        # so the user can never escape the forced-change flow with a lying row.
+        with transaction.atomic():
+            form.save()  # set_password + user.save (Django 5.2 PasswordChangeForm)
+            update_session_auth_hash(self.request, form.user)
+            profile = _ensure_must_change_profile(self.request.user)
+            profile.must_change_password = False
+            profile.save()
+            log_action(self.request.user, AuditLog.Action.PASSWORD_CHANGED, self.request.user)
+        return redirect(self.get_success_url())
 
 
 @login_required

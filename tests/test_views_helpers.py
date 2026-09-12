@@ -98,3 +98,38 @@ class TestAuditContextManager:
 
         # Audit row MUST NOT be persisted — atomic block rolled back.
         assert AuditLog.objects.filter(object_id=resource.pk).count() == 0
+
+
+@pytest.mark.django_db
+class TestLogActionTruncation:
+    """REQ-JD-01 — log_action is the single producer of object_repr and must
+    truncate str(obj) to the AuditLog.object_repr column width (80 chars)."""
+
+    def setup_method(self):
+        from django.contrib.auth.models import User
+        self.user = User.objects.create_user(username="auditor", password="x")
+
+    def test_log_action_truncates_object_repr_at_80(self):
+        """REQ-JD-01 Scenario 1.2 — >80-char str(obj) is truncated to exactly 80."""
+        from core.models import Resource
+        resource = Resource.objects.create(name="r" * 120, resource_type="server")
+
+        log_action(self.user, AuditLog.Action.RESOURCE_CREATED, resource)
+
+        row = AuditLog.objects.get(
+            object_type="Resource", object_id=resource.pk
+        )
+        assert len(row.object_repr) == 80
+        assert row.object_repr == str(resource)[:80]
+
+    def test_log_action_keeps_short_object_repr_intact(self):
+        """REQ-JD-01 Scenario 1.3 — ≤80-char reprs pass through unmodified."""
+        from core.models import Resource
+        resource = Resource.objects.create(name="short-res", resource_type="server")
+
+        log_action(self.user, AuditLog.Action.RESOURCE_CREATED, resource)
+
+        row = AuditLog.objects.get(
+            object_type="Resource", object_id=resource.pk
+        )
+        assert row.object_repr == str(resource)

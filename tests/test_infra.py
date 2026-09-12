@@ -1,6 +1,7 @@
 """Infrastructure tests — database configuration, env vars, entrypoint logic."""
 import os
 import importlib
+import re
 import subprocess
 from pathlib import Path
 
@@ -182,17 +183,18 @@ class TestEntrypointSeedLogic:
         )
 
     def test_seed_runs_when_seed_demo_true(self, entrypoint_path):
-        """Production opt-in: SEED_DEMO=True triggers seed explicitly."""
+        """Production opt-in: SEED_DEMO=true (lowercase) triggers seed explicitly."""
         content = entrypoint_path.read_text()
-        assert '"$SEED_DEMO" = "True"' in content, (
-            "entrypoint.sh must check SEED_DEMO=True for production opt-in seeding"
+        assert '"$SEED_DEMO" = "true"' in content, (
+            "entrypoint.sh must check SEED_DEMO=true (lowercase) for production "
+            "opt-in seeding, matching the seed_data production guard"
         )
 
     def test_conditional_uses_or_logic(self, entrypoint_path):
         """Both conditions use OR: local auto OR production opt-in."""
         content = entrypoint_path.read_text()
         # The if statement should use || between the two conditions
-        assert "[ -z \"$DATABASE_URL\" ] || [ \"$SEED_DEMO\" = \"True\" ]" in content, (
+        assert "[ -z \"$DATABASE_URL\" ] || [ \"$SEED_DEMO\" = \"true\" ]" in content, (
             "entrypoint.sh must use OR logic: local auto-seed OR production opt-in"
         )
 
@@ -202,7 +204,7 @@ class TestEntrypointSeedLogic:
             [
                 "sh", "-c",
                 'unset DATABASE_URL; unset SEED_DEMO; '
-                'if [ -z "$DATABASE_URL" ] || [ "$SEED_DEMO" = "True" ]; '
+                'if [ -z "$DATABASE_URL" ] || [ "$SEED_DEMO" = "true" ]; '
                 'then echo "SEED_RUN"; else echo "SEED_SKIP"; fi',
             ],
             capture_output=True,
@@ -218,7 +220,7 @@ class TestEntrypointSeedLogic:
             [
                 "sh", "-c",
                 'DATABASE_URL=postgres://x:y@host:5432/db; unset SEED_DEMO; '
-                'if [ -z "$DATABASE_URL" ] || [ "$SEED_DEMO" = "True" ]; '
+                'if [ -z "$DATABASE_URL" ] || [ "$SEED_DEMO" = "true" ]; '
                 'then echo "SEED_RUN"; else echo "SEED_SKIP"; fi',
             ],
             capture_output=True,
@@ -229,12 +231,12 @@ class TestEntrypointSeedLogic:
         )
 
     def test_production_opt_in_triggers_seed(self):
-        """Production opt-in (DATABASE_URL set, SEED_DEMO=True): seed must run."""
+        """Production opt-in (DATABASE_URL set, SEED_DEMO=true): seed must run."""
         result = subprocess.run(
             [
                 "sh", "-c",
-                'DATABASE_URL=postgres://x:y@host:5432/db; SEED_DEMO=True; '
-                'if [ -z "$DATABASE_URL" ] || [ "$SEED_DEMO" = "True" ]; '
+                'DATABASE_URL=postgres://x:y@host:5432/db; SEED_DEMO=true; '
+                'if [ -z "$DATABASE_URL" ] || [ "$SEED_DEMO" = "true" ]; '
                 'then echo "SEED_RUN"; else echo "SEED_SKIP"; fi',
             ],
             capture_output=True,
@@ -243,6 +245,85 @@ class TestEntrypointSeedLogic:
         assert "SEED_RUN" in result.stdout, (
             f"Production opt-in should trigger seed, got: {result.stdout}"
         )
+
+    # ── REQ-JD-03 — lowercase SEED_DEMO contract (entrypoint ⇄ seed_data) ──
+
+    @staticmethod
+    def _entrypoint_seed_gate() -> str:
+        """Extract the real `if [ -z "$DATABASE_URL" ] || [ "$SEED_DEMO" = "x" ]`
+        line from entrypoint.sh so shell behavior tests exercise the actual
+        gate literal instead of a duplicated copy."""
+        gate_path = Path(__file__).resolve().parent.parent / "entrypoint.sh"
+        content = gate_path.read_text()
+        match = re.search(
+            r'^[ \t]*if \[ -z "\$DATABASE_URL" \] \|\| \[ "\$SEED_DEMO" = "[^"]+" \]; then$',
+            content,
+            re.MULTILINE,
+        )
+        assert match is not None, "entrypoint.sh seed gate line not found"
+        return match.group(0)
+
+    def test_production_opt_in_lowercase_true_triggers_seed(self):
+        """REQ-JD-03 Scenario 3.1 — DATABASE_URL set + SEED_DEMO=true must run
+        the seed path through the REAL entrypoint gate (the regression this
+        change fixes: the gate used to know only capital "True")."""
+        gate = self._entrypoint_seed_gate()
+        result = subprocess.run(
+            [
+                "sh", "-c",
+                'DATABASE_URL=postgres://x:y@host:5432/db; SEED_DEMO=true; '
+                f'{gate} '
+                'echo "SEED_RUN"; else echo "SEED_SKIP"; fi',
+            ],
+            capture_output=True,
+            text=True,
+        )
+        assert "SEED_RUN" in result.stdout, (
+            f"Documented SEED_DEMO=true opt-in should trigger seed, got: {result.stdout}"
+        )
+
+    def test_production_capital_true_is_not_an_opt_in(self):
+        """REQ-JD-03 Scenario 3.2 — SEED_DEMO=True (capital) must NOT run the
+        seed path: entrypoint and seed_data share one case-sensitive contract,
+        and the command's own guard refuses capital True."""
+        gate = self._entrypoint_seed_gate()
+        result = subprocess.run(
+            [
+                "sh", "-c",
+                'DATABASE_URL=postgres://x:y@host:5432/db; SEED_DEMO=True; '
+                f'{gate} '
+                'echo "SEED_RUN"; else echo "SEED_SKIP"; fi',
+            ],
+            capture_output=True,
+            text=True,
+        )
+        assert "SEED_SKIP" in result.stdout, (
+            f"Capital True must not be an opt-in, got: {result.stdout}"
+        )
+
+    def test_seed_data_opt_in_value_aligned_with_entrypoint(self):
+        """REQ-JD-03 Scenario 3.3 — entrypoint and seed_data must gate on the
+        same case-sensitive opt-in token, and it must be lowercase "true"."""
+        import re
+
+        repo_root = Path(__file__).resolve().parent.parent
+        entrypoint = (repo_root / "entrypoint.sh").read_text()
+        seed_data = (
+            repo_root / "core" / "management" / "commands" / "seed_data.py"
+        ).read_text()
+
+        entrypoint_token = re.search(
+            r'\[\s*"\$SEED_DEMO"\s*=\s*"([^"]+)"\s*\]', entrypoint
+        )
+        seed_data_token = re.search(
+            r'os\.environ\.get\("SEED_DEMO"\)\s*!=\s*"([^"]+)"', seed_data
+        )
+        assert entrypoint_token is not None, "entrypoint.sh opt-in token not found"
+        assert seed_data_token is not None, "seed_data opt-in token not found"
+        assert entrypoint_token.group(1) == seed_data_token.group(1), (
+            "entrypoint.sh and seed_data.py must use the same SEED_DEMO token"
+        )
+        assert entrypoint_token.group(1) == "true"
 
     # ── SEC-002 carve-out: entrypoint delegates superuser creation ──────
 

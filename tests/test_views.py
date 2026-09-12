@@ -118,6 +118,32 @@ class TestResourceCreateView:
         )
         assert response.status_code == 200
 
+    def test_editor_can_create_with_120_char_name_writes_truncated_audit_repr(self, editor_client):
+        """REQ-JD-01 Scenario 1.1 — a 120-char name must not overflow object_repr(80).
+
+        Pre-fix: str(obj) is 120 chars, AuditLog.objects.create() raises
+        DataError AFTER the resource INSERT commits → 500 and a resource
+        with no audit row.
+        """
+        response = editor_client.post(
+            "/resources/create/",
+            data={
+                "name": "r" * 120,
+                "resource_type": "server",
+                "environment": "dev",
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        assert response.status_code == 200
+        resource = Resource.objects.get(name="r" * 120)
+        rows = AuditLog.objects.filter(
+            object_type="Resource", object_id=resource.pk
+        )
+        assert rows.count() == 1
+        row = rows.first()
+        assert len(row.object_repr) <= 80
+        assert row.object_repr == resource.name[:80]
+
 
 @pytest.mark.django_db
 class TestResourceDeleteView:
@@ -407,6 +433,32 @@ class TestGrantCreateView:
             HTTP_X_REQUESTED_WITH="XMLHttpRequest",
         )
         assert response.status_code == 200
+
+    def test_admin_can_create_grant_with_long_names_writes_truncated_audit_repr(self, admin_client):
+        """REQ-JD-01 — grant audit repr (user → resource (level)) must fit 80 chars."""
+        resource = Resource.objects.create(
+            name="server-" + "x" * 112,
+            resource_type="server",
+        )
+        target_user = User.objects.create_user(username="u" * 100, password="pass")
+
+        response = admin_client.post(
+            f"/resources/{resource.pk}/grants/create/",
+            data={
+                "user": target_user.pk,
+                "access_level": "read",
+                "start_at": "2026-01-01",
+                "end_at": "2026-07-09",
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        assert response.status_code == 200
+        grant = AccessGrant.objects.get(resource=resource, user=target_user)
+        rows = AuditLog.objects.filter(
+            object_type="AccessGrant", object_id=grant.pk
+        )
+        assert rows.count() == 1
+        assert len(rows.first().object_repr) <= 80
 
 
 @pytest.mark.django_db
@@ -1148,6 +1200,56 @@ class TestPasswordChangeAuditLog:
             action="password_changed", user=user
         ).exists()
 
+    def test_password_change_save_failure_keeps_flag_and_no_audit(self, forced_password_client):
+        """REQ-JD-02 Scenario 2.3 — password persistence failure must not clear
+        the forced-change flag, must not write the audit row, and must leave
+        the old password effective.
+
+        Pre-fix, flag+audit commit BEFORE the password save with no
+        transaction, so the user escapes the forced-change flow with a lying
+        audit row. Inject the failure at the model write (User.save) — the
+        persistence point of PasswordChangeForm.save — and assert observable
+        state only. The dedicated client suppresses exception re-raise
+        (Django 5.2 moved raise_request_exception to the constructor).
+        """
+        from unittest.mock import patch
+
+        from django.test import Client as TestClient
+
+        user = User.objects.get(username="forced1")
+
+        # Django 5.2: raise_request_exception is a Client constructor arg.
+        injected_client = TestClient(raise_request_exception=False)
+        assert injected_client.login(username="forced1", password="ForcedPass123!")
+
+        with patch(
+            "django.contrib.auth.models.User.save",
+            side_effect=RuntimeError("injected save failure"),
+        ):
+            response = injected_client.post(
+                "/password/change/",
+                data={
+                    "old_password": "ForcedPass123!",
+                    "new_password1": "Newpass123!",
+                    "new_password2": "Newpass123!",
+                },
+            )
+
+        assert response.status_code == 500
+
+        user.profile.refresh_from_db()
+        assert user.profile.must_change_password is True
+        assert (
+            AuditLog.objects.filter(action="password_changed", user=user).count() == 0
+        )
+        # Old password still effective; new password was never persisted.
+        assert forced_password_client.login(
+            username="forced1", password="ForcedPass123!"
+        )
+        assert not forced_password_client.login(
+            username="forced1", password="Newpass123!"
+        )
+
 
 @pytest.mark.django_db
 class TestCustomPasswordChangeView:
@@ -1181,6 +1283,52 @@ class TestCustomPasswordChangeView:
         )
         assert response.status_code == 302
         assert response.url == "/resources/"
+
+    def test_password_change_with_missing_profile_does_not_crash(self, forced_password_client):
+        """REQ-JD-02 Scenario 2.2 — a missing Profile must be recreated
+        defensively, not crash the view with Profile.DoesNotExist."""
+        user = User.objects.get(username="forced1")
+        user.profile.delete()
+
+        response = forced_password_client.post(
+            "/password/change/",
+            data={
+                "old_password": "ForcedPass123!",
+                "new_password1": "Newpass123!",
+                "new_password2": "Newpass123!",
+            },
+        )
+
+        assert response.status_code == 302
+        profile = Profile.objects.get(user=user)
+        assert profile.must_change_password is False
+        assert (
+            AuditLog.objects.filter(action="password_changed", user=user).count() == 1
+        )
+
+    def test_password_change_success_persists_password_then_flag_then_audit(self, forced_password_client):
+        """REQ-JD-02 Scenario 2.1 — happy path: new password works, flag False,
+        exactly one PASSWORD_CHANGED row."""
+        response = forced_password_client.post(
+            "/password/change/",
+            data={
+                "old_password": "ForcedPass123!",
+                "new_password1": "Newpass123!",
+                "new_password2": "Newpass123!",
+            },
+        )
+
+        assert response.status_code == 302
+        assert response.url == "/resources/"
+        user = User.objects.get(username="forced1")
+        assert forced_password_client.login(
+            username="forced1", password="Newpass123!"
+        )
+        user.profile.refresh_from_db()
+        assert user.profile.must_change_password is False
+        assert (
+            AuditLog.objects.filter(action="password_changed", user=user).count() == 1
+        )
 
 
 # ════════════════════════════════════════════════════════════════════════════════

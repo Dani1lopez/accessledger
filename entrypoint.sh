@@ -6,7 +6,7 @@ echo "Aplicando migraciones..."
 python manage.py migrate --noinput
 echo "Demo roles/data se crean en background (no bloquea el arranque)..."
 (
-  if [ -z "$DATABASE_URL" ] || [ "$SEED_DEMO" = "True" ]; then
+  if [ -z "$DATABASE_URL" ] || [ "$SEED_DEMO" = "true" ]; then
     python manage.py bootstrap_roles && python manage.py seed_data || echo "WARNING: demo seeding falló — ignorando"
   fi
 ) &
