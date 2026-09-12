@@ -1,5 +1,52 @@
 #!/bin/sh
 set -ex
+
+echo "Waiting for the database to be ready..."
+python - <<'PY'
+import os
+import sys
+import time
+
+import psycopg
+
+retries = int(os.environ.get("DB_READY_RETRIES", "30"))
+wait = float(os.environ.get("DB_READY_WAIT", "2"))
+
+if os.environ.get("DATABASE_URL"):
+    def connect():
+        return psycopg.connect(os.environ["DATABASE_URL"], connect_timeout=5)
+else:
+    params = {
+        "host": os.environ.get("POSTGRES_HOST", "db"),
+        "port": os.environ.get("POSTGRES_PORT", "5432"),
+        "dbname": os.environ.get("POSTGRES_DB", "postgres"),
+        "user": os.environ.get("POSTGRES_USER", "postgres"),
+        "password": os.environ.get("POSTGRES_PASSWORD", ""),
+    }
+
+    def connect():
+        return psycopg.connect(**params, connect_timeout=5)
+
+for attempt in range(1, retries + 1):
+    try:
+        conn = connect()
+    except Exception as exc:
+        print(f"[db-ready] attempt {attempt}/{retries} failed: {exc}", flush=True)
+        if attempt < retries:
+            time.sleep(wait)
+    else:
+        conn.close()
+        print(f"[db-ready] database is ready (attempt {attempt}/{retries})", flush=True)
+        sys.exit(0)
+
+print(
+    f"[db-ready] FATAL: database not reachable after {retries} attempts; "
+    "refusing to start the server against a dead database.",
+    flush=True,
+)
+sys.exit(1)
+PY
+
 echo "Collecting static files..."
 python manage.py collectstatic --noinput --clear
 echo "Aplicando migraciones..."

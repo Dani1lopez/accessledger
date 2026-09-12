@@ -1,5 +1,6 @@
 """Infrastructure tests — database configuration, env vars, entrypoint logic."""
 import os
+import sys
 import importlib
 import re
 import subprocess
@@ -432,3 +433,160 @@ class TestEffectiveDbHostNotForceRewritten:
         host = settings.DATABASES["default"]["HOST"]
         assert host, "DATABASES HOST must be a non-empty string"
         assert isinstance(host, str)
+
+
+# ── F3 hardening: DB readiness wait with retries in entrypoint.sh ────────
+
+class TestEntrypointDbReadiness:
+    """F3: entrypoint.sh must probe PostgreSQL with retries before any
+    DB-touching step, so a transient DNS/connection blip (Render incident:
+    NXDOMAIN on an expired/free-tier host) no longer kills the container
+    before gunicorn binds.
+    """
+
+    @pytest.fixture
+    def entrypoint_path(self):
+        return Path(__file__).resolve().parent.parent / "entrypoint.sh"
+
+    @staticmethod
+    def _readiness_snippet(entrypoint_text: str) -> str:
+        """Extract the real `python - <<'PY' ... PY` readiness heredoc so the
+        behavior tests execute the actual shipped snippet, not a copy."""
+        match = re.search(r"python - <<'PY'\n(.*?)\nPY", entrypoint_text, re.DOTALL)
+        assert match is not None, (
+            "entrypoint.sh must contain a `python - <<'PY'` heredoc readiness check"
+        )
+        return match.group(0)
+
+    @staticmethod
+    def _run_snippet(snippet: str, extra_env: dict) -> subprocess.CompletedProcess:
+        """Run the extracted snippet under `sh -c` with `python` resolved to the
+        test venv interpreter (which has psycopg installed)."""
+        env = os.environ.copy()
+        env.update(extra_env)
+        # Do NOT resolve sys.executable: the venv bin dir (parent of the
+        # `python` symlink) is what provides a `python` with psycopg.
+        venv_bin = Path(sys.executable).parent
+        env["PATH"] = str(venv_bin) + os.pathsep + env.get("PATH", "")
+        return subprocess.run(
+            ["sh", "-c", snippet],
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=20,
+        )
+
+    # ── Source-parity tests ──────────────────────────────────────────────
+
+    def test_readiness_block_precedes_db_touching_steps(self, entrypoint_path):
+        """Order contract: the readiness probe must run before collectstatic
+        and before migrate (any DB-touching step)."""
+        content = entrypoint_path.read_text()
+        snippet = self._readiness_snippet(content)
+        assert content.index(snippet) < content.index("collectstatic"), (
+            "readiness block must run before collectstatic"
+        )
+        assert content.index(snippet) < content.index("migrate --noinput"), (
+            "readiness block must run before migrate"
+        )
+
+    def test_retry_env_vars_referenced_with_defaults(self, entrypoint_path):
+        """Retry count and wait must come from DB_READY_RETRIES/DB_READY_WAIT
+        with defaults 30 / 2 so tests (and operators) can tune them."""
+        content = entrypoint_path.read_text()
+        assert 'os.environ.get("DB_READY_RETRIES", "30")' in content, (
+            "entrypoint.sh must read DB_READY_RETRIES with default 30"
+        )
+        assert 'os.environ.get("DB_READY_WAIT", "2")' in content, (
+            "entrypoint.sh must read DB_READY_WAIT with default 2"
+        )
+
+    def test_gunicorn_bind_token_in_entrypoint(self, entrypoint_path):
+        """F1 (half): the entrypoint gunicorn line must bind 0.0.0.0:${PORT:-8080}."""
+        content = entrypoint_path.read_text()
+        gunicorn_lines = [line for line in content.splitlines() if "gunicorn" in line]
+        assert gunicorn_lines, "entrypoint.sh must have a gunicorn line"
+        for line in gunicorn_lines:
+            assert "--bind 0.0.0.0:${PORT:-8080}" in line, (
+                f"entrypoint gunicorn line must bind 0.0.0.0:${{PORT:-8080}}: {line}"
+            )
+
+    # ── Behavior tests (real PostgreSQL at 127.0.0.1 is up for the suite) ──
+
+    def test_failure_path_closed_port_exits_nonzero(self):
+        """DATABASE_URL pointing at a closed port with 2 retries / 0 wait must
+        exit nonzero — after visibly retrying, not on the first blip."""
+        snippet = self._readiness_snippet(
+            (Path(__file__).resolve().parent.parent / "entrypoint.sh").read_text()
+        )
+        result = self._run_snippet(
+            snippet,
+            {
+                "DATABASE_URL": "postgres://u:p@127.0.0.1:1/db",
+                "DB_READY_RETRIES": "2",
+                "DB_READY_WAIT": "0",
+            },
+        )
+        assert result.returncode != 0, (
+            f"closed-port DATABASE_URL must exit nonzero, got: {result.stdout}"
+        )
+        assert "attempt 2/2" in result.stdout, (
+            "failure path must retry before giving up, stdout was: "
+            f"{result.stdout!r}"
+        )
+
+    def test_success_path_local_db_exits_zero(self):
+        """POSTGRES_* conninfo against the suite's real local PostgreSQL must
+        exit 0 on the first attempt."""
+        snippet = self._readiness_snippet(
+            (Path(__file__).resolve().parent.parent / "entrypoint.sh").read_text()
+        )
+        env = {"POSTGRES_HOST": "127.0.0.1"}
+        # Pass through the suite's real DB creds (.env.test loads them into
+        # os.environ); only force the host to the loopback interface.
+        for var in ("POSTGRES_DB", "POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_PORT"):
+            if var in os.environ:
+                env[var] = os.environ[var]
+        result = self._run_snippet(snippet, env)
+        assert result.returncode == 0, (
+            f"readiness probe against the local DB must exit 0, got: "
+            f"rc={result.returncode} stdout={result.stdout!r} stderr={result.stderr!r}"
+        )
+
+
+class TestProcfileBindParity:
+    """F1: the Procfile gunicorn invocation must match entrypoint.sh exactly,
+    including `--bind 0.0.0.0:${PORT:-8080}` (Render 'No open ports detected'
+    incident: default gunicorn bind is 127.0.0.1:8000, unreachable externally).
+    """
+
+    @pytest.fixture
+    def procfile_path(self):
+        return Path(__file__).resolve().parent.parent / "Procfile"
+
+    def test_procfile_binds_public_interface(self, procfile_path):
+        """Procfile must carry the explicit public bind token."""
+        content = procfile_path.read_text()
+        assert "--bind 0.0.0.0:${PORT:-8080}" in content, (
+            "Procfile must bind 0.0.0.0:${PORT:-8080} so the platform can detect "
+            "open ports"
+        )
+
+    def test_procfile_matches_entrypoint_gunicorn_invocation(self, procfile_path):
+        """Token parity: Procfile's gunicorn argument vector must equal the
+        entrypoint.sh gunicorn line (minus the `exec` prefix and `web:` label)."""
+        repo = Path(__file__).resolve().parent.parent
+        entrypoint = (repo / "entrypoint.sh").read_text()
+        procfile = procfile_path.read_text()
+
+        entry_line = next(
+            line for line in entrypoint.splitlines() if "gunicorn" in line
+        )
+        entry_args = entry_line.replace("exec ", "").split()
+        proc_args = procfile.strip().split()
+
+        assert proc_args[0] == "web:", "Procfile first token must be the web label"
+        assert proc_args[1:] == entry_args, (
+            f"Procfile gunicorn args {proc_args[1:]} must match entrypoint.sh "
+            f"gunicorn args {entry_args}"
+        )
