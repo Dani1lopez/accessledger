@@ -1,0 +1,114 @@
+name: Audit finding
+description: Report an evidence-backed audit finding (defect or product feature proposal).
+title: "[Audit]: "
+labels:
+  - status:needs-review
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for evidence-backed audit findings. Every claim must point to
+        concrete, verifiable evidence (file paths, line ranges, commands, logs, or
+        reproduction steps). Do not include secrets, credentials, tokens, private
+        keys, or any `.env` file content. Findings without evidence may be closed.
+
+  - type: textarea
+    id: evidence-summary
+    attributes:
+      label: Evidence summary
+      description: One-paragraph summary of the finding and what the evidence shows.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      description: Select the single best-fitting category.
+      options:
+        - Bug
+        - Security
+        - Performance
+        - Concurrency
+        - Data integrity
+        - Architecture
+        - Clean code
+        - Documentation
+        - Product feature
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      description: |
+        Overall severity of the finding. For `Product feature` proposals, rate the
+        value/urgency of the gap; do not claim a security impact that is not
+        supported by evidence.
+      options:
+        - Critical
+        - High
+        - Medium
+        - Low
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence-locations
+    attributes:
+      label: Exact evidence locations
+      description: |
+        Precise references backing the claim: file paths with line ranges, commit
+        hashes, commands with output, logs, or screenshots. Use fenced code blocks.
+        Example: `src/services/ledger.py:120-145`.
+      placeholder: |
+        - path/to/file.py:120-145 — description of what is shown there
+        - command and output excerpt
+    validations:
+      required: true
+
+  - type: textarea
+    id: impact-and-preconditions
+    attributes:
+      label: Impact and trigger / preconditions
+      description: |
+        For defects: the impact and the exact trigger conditions or preconditions
+        needed to reproduce it. For `Product feature` proposals: the user value and
+        the context in which the need appears. Do not overstate impact beyond what
+        the evidence supports.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-outcome
+    attributes:
+      label: Proposed outcome / acceptance criteria
+      description: |
+        The desired end state, expressed as concrete, checkable acceptance criteria.
+        For defects: the corrected behavior. For `Product feature` proposals: the
+        feature behavior and its acceptance criteria.
+    validations:
+      required: true
+
+  - type: textarea
+    id: verification-notes
+    attributes:
+      label: Verification notes
+      description: |
+        How a reviewer can verify this finding: commands to run, tests to execute,
+        scenarios to exercise, or evidence to re-check. Include expected results.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: attestation
+    attributes:
+      label: Attestation
+      description: You must confirm both statements before submitting.
+      options:
+        - label: >
+            I confirm this report contains no secrets, credentials, tokens, private
+            keys, or `.env` file content, and every claim in it is backed by the
+            evidence I listed above.
+          required: true
