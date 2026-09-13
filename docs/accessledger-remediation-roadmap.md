@@ -36,7 +36,7 @@ What remains is a **second, smaller wave of confirmed defects** found by the cur
 | **Closed** (with evidence comments) | #56, #57, #58, #59, #81 | Done — verified as closed; no further work. These covered stale findings that current main has fixed (see §4). |
 | **Updated and scoped** | #62, #65, #79, #90, #98 | Scoped in this roadmap; each maps into a §3 cluster or P2 work. Do not reopen; execute residual scope from §3/P2. |
 | **Open, confirmed valid** | #82 | Still valid: `entrypoint.sh:2` runs `set -ex`; the credential-bearing test at `entrypoint.sh:61` (`[ -n "$DJANGO_SUPERUSER_PASSWORD" ]`) expands the real password into the shell trace. See V-01. |
-| **Published tracking** | Form published on main in commit `25c8004`; milestone `Audit Remediation 2026` open as milestone #1 | **New confirmed issues:** V-05 #105, V-06 #106, V-07 #107, V-08/V-09 #108, V-10 #109, V-11 #110, V-12 #111, V-15 #112. **Product issues:** F1 #113, F2 #114, F3 #115, F4 #116, F5 #117, F6 #118, F7 #119. **Existing equivalents reused (no duplicates created):** V-02 #72, V-03 #80, V-04 residual overlaps #78/#80, V-13 #92, V-14 #76, V-16 #84, V-17 #83; V-18 is split across existing #63/#64/#65/#97 and product #117. **#82 remains V-01.** The only unmapped work item is the grant invariants cluster (§3), which needs an issue filed under the milestone. |
+| **Published tracking** | Form published on main in commit `25c8004`; milestone `Audit Remediation 2026` open as milestone #1 | **New confirmed issues:** V-05 #105, V-06 #106, V-07 #107, V-08/V-09 #108, V-10 #109, V-11 #110, V-12 #111, V-15 #112. **Product issues:** F1 #113, F2 #114, F3 #115, F4 #116, F5 #117, F6 #118, F7 #119. **Existing equivalents reused (no duplicates created):** V-02 #72, V-03 #80, V-04 residual overlaps #78/#80, V-13 #92, V-14 #76, V-16 #84, V-17 #83; V-18 is split across existing #63/#64/#65/#97 and product #117; grant invariants cluster maps to existing #77 (duplicate active grants) and #78 (invalid grant state transitions). **#82 remains V-01.** All work items are mapped. Milestone `Audit Remediation 2026` contains **31 open issues**: existing #62, #63, #64, #65, #72, #76, #77, #78, #80, #82, #83, #84, #90, #92, #97, #98 plus new #105–#119. |
 
 ---
 
@@ -168,7 +168,7 @@ Every row was verified in the current working tree. IDs `JD-I*` reference `.atl/
 - **Evidence:** `AccessGrant.Meta` (`core/models.py`) has indexes but **no unique constraint** on `(user, resource, status='active')`-style invariant (JD-I7); `grant_create` allows grants born already-expired (`end_at <= start_at`) or targeting inactive users (JD-I18); `grant_revoke` has no status precondition and can overwrite an already-expired grant with `revoked` (JD-I5).
 - **Fix:** DB-level partial unique constraint for one active grant per (user, resource); form-level validation of dates/target state; transition precondition in `grant_revoke` (409/no-op rule decided once in the policy module).
 - **Acceptance:** duplicate active grant rejected at DB and form level; expired-born grant rejected; revoking an expired grant has one defined behavior with a test; migration reviewed.
-- **issue:** none yet — file under milestone `Audit Remediation 2026` (milestone #1).
+- **issue:** existing #77 (duplicate active grants) and #78 (invalid grant state transitions) — no new issue (avoid duplicates).
 
 **P1 ordering note:** V-07 (policy module) lands first — V-02 and the invariant cluster consume it. Everything else is independent.
 
@@ -257,7 +257,7 @@ Dependency order: **P0 gates P1** (policy decision + tracker alignment) → **P1
 | Step | Action | Acceptance criterion | State |
 |---|---|---|---|
 | 0.1 | Publish the YAML Issue Forms the publication policy requires | Forms reach the default branch; issue creation unblocked | **Done** — published on main in commit `25c8004` |
-| 0.2 | Create issues for V-01…V-18 and the §5 features | Every roadmap row has an issue; no invented numbers | **Done** — new issues #105–#112 and #113–#119 filed; existing equivalents reused (#72, #76, #78, #80, #83, #84, #92, #63, #64, #65, #97, #82); only the grant invariants cluster still needs an issue under milestone `Audit Remediation 2026` (#1) |
+| 0.2 | Create issues for V-01…V-18 and the §5 features | Every roadmap row has an issue; no invented numbers | **Done** — new issues #105–#112 and #113–#119 filed; existing equivalents reused (#72, #76, #77, #78, #80, #83, #84, #92, #63, #64, #65, #97, #82); milestone `Audit Remediation 2026` (#1) holds 31 open issues (existing #62/#63/#64/#65/#72/#76/#77/#78/#80/#82/#83/#84/#90/#92/#97/#98 + #105–#119) |
 | 0.3 | Decide the V-03 mechanism (adopt `_audit` everywhere vs delete it) | One decision recorded, applied to all four sites | Open |
 | 0.4 | Decide the revoke-transition rule (precondition + status code) for the invariants cluster | Documented in the policy module | Open |
 
@@ -292,7 +292,7 @@ Dependency order: **P0 gates P1** (policy decision + tracker alignment) → **P1
 ## 9. Master Checklist
 
 - [x] **P0** Issue Form published to the default branch (commit `25c8004`); milestone `Audit Remediation 2026` open as milestone #1
-- [x] **P0** Issues mapped for V-01…V-18 and F1–F7 (new #105–#112, #113–#119; existing #72/#76/#78/#80/#83/#84/#92/#63/#64/#65/#97 reused; #82 remains V-01) — grant invariants cluster issue still to be filed
+- [x] **P0** Issues mapped for V-01…V-18 and F1–F7 (new #105–#112, #113–#119; existing #72/#76/#77/#78/#80/#83/#84/#92/#63/#64/#65/#97 reused; #82 remains V-01) — milestone `Audit Remediation 2026` holds 31 open issues
 - [ ] **P0** V-03 mechanism and revoke-transition rule decided
 - [ ] **P1** V-01…V-18 fixed, each with a behavior-first test; full suite green
 - [ ] **P1** `check --deploy` free of unexplained W008/W021
@@ -308,5 +308,5 @@ Dependency order: **P0 gates P1** (policy decision + tracker alignment) → **P1
 ## 10. Boundaries of This Document
 
 - This roadmap reflects the **current consolidated audit** (ledger + verify reports + this session's on-disk verification), not the stale 2026-08-31 static findings — those are discarded in §4 with fix evidence.
-- Issue numbers in this document are confirmed published mappings supplied by the tracker state: new issues #105–#112 (defects) and #113–#119 (product features); existing equivalents reused instead of duplicates (#72, #76, #78, #80, #83, #84, #92, #63, #64, #65, #97, #82). The only unmapped item is the grant invariants cluster (§3), marked as still needing an issue under milestone `Audit Remediation 2026` (#1).
+- Issue numbers in this document are confirmed published mappings supplied by the tracker state: new issues #105–#112 (defects) and #113–#119 (product features); existing equivalents reused instead of duplicates (#72, #76, #77, #78, #80, #83, #84, #92, #63, #64, #65, #97, #82). Milestone `Audit Remediation 2026` (#1) contains 31 open issues: existing #62/#63/#64/#65/#72/#76/#77/#78/#80/#82/#83/#84/#90/#92/#97/#98 plus new #105–#119.
 - Severity labels are the consolidated audit's; nothing here authorizes code changes — all implementation flows through the mapped issues.
