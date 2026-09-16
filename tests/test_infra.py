@@ -554,6 +554,112 @@ class TestEntrypointDbReadiness:
         )
 
 
+# ── Issue #82: entrypoint must not enable xtrace (secret leak via shell trace) ──
+
+class TestEntrypointNoXtraceSecretLeak:
+    """Issue #82: `set -ex` made the shell trace every expanded command
+    (including the seed gate and the superuser gate), so DATABASE_URL and
+    DJANGO_SUPERUSER_* values landed verbatim in container logs via xtrace.
+    The entrypoint must keep fail-fast (`set -e`) but must never enable
+    xtrace, so secret-bearing env values can never reach the logs.
+    """
+
+    DATABASE_URL_CANARY = (
+        "postgres://xtrace-canary-dbuser:xtrace-canary-dbpass"
+        "@xtrace-canary-host.invalid:5432/xtrace-canary-db"
+    )
+    USERNAME_CANARY = "xtrace-canary-superuser-username"
+    PASSWORD_CANARY = "xtrace-canary-superuser-password"
+    PORT_CANARY = "xtrace-canary-port"
+
+    @pytest.fixture
+    def entrypoint_path(self):
+        return Path(__file__).resolve().parent.parent / "entrypoint.sh"
+
+    @pytest.fixture(scope="class")
+    def entrypoint_run(self, tmp_path_factory):
+        """Run the REAL entrypoint.sh once with stubbed `python`/`gunicorn`
+        so every shell line — including the seed gate and the superuser
+        gate — executes without touching Django, the DB, or staticfiles."""
+        stub_dir = tmp_path_factory.mktemp("xtrace-stubs")
+        for name in ("python", "gunicorn"):
+            stub = stub_dir / name
+            stub.write_text("#!/bin/sh\nexit 0\n")
+            stub.chmod(0o755)
+        env = os.environ.copy()
+        env["PATH"] = str(stub_dir) + os.pathsep + env.get("PATH", "")
+        env["DATABASE_URL"] = self.DATABASE_URL_CANARY
+        env["DJANGO_SUPERUSER_USERNAME"] = self.USERNAME_CANARY
+        env["DJANGO_SUPERUSER_PASSWORD"] = self.PASSWORD_CANARY
+        env["PORT"] = self.PORT_CANARY
+        env.pop("DEBUG", None)
+        entrypoint = Path(__file__).resolve().parent.parent / "entrypoint.sh"
+        return subprocess.run(
+            ["sh", str(entrypoint)],
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=20,
+        )
+
+    def test_entrypoint_runs_to_completion_with_stubs(self, entrypoint_run):
+        """Sanity: the stubbed run must reach the final exec (exit 0), so the
+        sibling tests exercise the whole script, not a prefix."""
+        assert entrypoint_run.returncode == 0, (
+            f"stubbed entrypoint run must exit 0, got rc="
+            f"{entrypoint_run.returncode} stdout={entrypoint_run.stdout!r} "
+            f"stderr={entrypoint_run.stderr!r}"
+        )
+
+    def test_entrypoint_does_not_enable_xtrace(self, entrypoint_run):
+        """Behavior: xtrace emits `+ command` trace lines; with canaries in
+        every gate the whole script runs, so none may appear in output."""
+        output = entrypoint_run.stdout + entrypoint_run.stderr
+        trace_lines = [
+            line for line in output.splitlines() if re.match(r"^\++ ", line)
+        ]
+        assert not trace_lines, (
+            "entrypoint.sh must not enable xtrace; trace lines leaked: "
+            f"{trace_lines[:5]!r}"
+        )
+
+    def test_entrypoint_does_not_emit_database_url_canary(self, entrypoint_run):
+        """Behavior: the DATABASE_URL canary must never be emitted by the
+        entrypoint shell trace (under `set -ex` the seed-gate trace printed
+        the full expanded URL)."""
+        output = entrypoint_run.stdout + entrypoint_run.stderr
+        assert self.DATABASE_URL_CANARY not in output, (
+            "entrypoint.sh shell trace must never emit DATABASE_URL; leaked: "
+            f"{output!r}"
+        )
+
+    def test_entrypoint_does_not_emit_superuser_credential_canaries(
+        self, entrypoint_run
+    ):
+        """Behavior: DJANGO_SUPERUSER_USERNAME/PASSWORD canaries must never be
+        emitted by the entrypoint shell trace (under `set -ex` the
+        superuser-gate trace printed the expanded values)."""
+        output = entrypoint_run.stdout + entrypoint_run.stderr
+        assert self.PASSWORD_CANARY not in output, (
+            "entrypoint.sh shell trace must never emit "
+            f"DJANGO_SUPERUSER_PASSWORD; leaked: {output!r}"
+        )
+        assert self.USERNAME_CANARY not in output, (
+            "entrypoint.sh shell trace must never emit "
+            f"DJANGO_SUPERUSER_USERNAME; leaked: {output!r}"
+        )
+
+    def test_entrypoint_set_line_is_fail_fast_only(self, entrypoint_path):
+        """Source guard: the option line must be exactly `set -e` — fail-fast
+        preserved, no xtrace, and no scope creep (no -u / pipefail)."""
+        content = entrypoint_path.read_text()
+        set_lines = [line for line in content.splitlines() if line.startswith("set ")]
+        assert set_lines == ["set -e"], (
+            f"entrypoint.sh must set exactly 'set -e' (fail-fast, no xtrace); "
+            f"found: {set_lines!r}"
+        )
+
+
 class TestProcfileBindParity:
     """F1: the Procfile gunicorn invocation must match entrypoint.sh exactly,
     including `--bind 0.0.0.0:${PORT:-8080}` (Render 'No open ports detected'
