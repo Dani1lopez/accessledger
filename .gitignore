@@ -81,5 +81,6 @@ Icon?
 openspec/
 
 # --- Docker ---
-**/.dockerignore
+# .dockerignore must NOT be gitignored: it travels with the repo so
+# image builds exclude secrets (.env) and local caches from the build context.
 *.pid
