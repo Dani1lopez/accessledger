@@ -1,5 +1,5 @@
 #!/bin/sh
-set -ex
+set -e
 
 echo "Waiting for the database to be ready..."
 python - <<'PY'
