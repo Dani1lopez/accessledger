@@ -696,3 +696,190 @@ class TestProcfileBindParity:
             f"Procfile gunicorn args {proc_args[1:]} must match entrypoint.sh "
             f"gunicorn args {entry_args}"
         )
+
+
+class TestDockerfileNonRootUser:
+    """Issue #89: the production image must run as a dedicated non-root user.
+
+    Render builds ./Dockerfile from the repo root; the container only needs
+    write access to /app/staticfiles (no MEDIA_ROOT exists), so the whole
+    /app tree must NOT be chowned to the runtime user.
+    """
+
+    @pytest.fixture
+    def dockerfile_path(self):
+        return Path(__file__).resolve().parent.parent / "Dockerfile"
+
+    @pytest.fixture
+    def dockerfile_lines(self, dockerfile_path):
+        return dockerfile_path.read_text().splitlines()
+
+    def _directive_indexes(self, lines, directive):
+        """Return 0-based indexes of instruction lines starting with `directive`."""
+        return [
+            i for i, line in enumerate(lines)
+            if line.strip().upper().startswith(directive.upper() + " ")
+        ]
+
+    def test_env_python_flags_set(self, dockerfile_lines):
+        """PYTHONDONTWRITEBYTECODE=1 and PYTHONUNBUFFERED=1 must be declared."""
+        env_lines = [
+            line for line in dockerfile_lines
+            if line.strip().upper().startswith("ENV ")
+        ]
+        env_text = "\n".join(env_lines)
+        assert "PYTHONDONTWRITEBYTECODE=1" in env_text, (
+            "Dockerfile must set PYTHONDONTWRITEBYTECODE=1"
+        )
+        assert "PYTHONUNBUFFERED=1" in env_text, (
+            "Dockerfile must set PYTHONUNBUFFERED=1"
+        )
+
+    def test_dedicated_system_user_created(self, dockerfile_lines):
+        """A dedicated system group and user must be created in the image."""
+        run_text = "\n".join(
+            line for line in dockerfile_lines
+            if line.strip().upper().startswith("RUN ")
+        )
+        assert "addgroup" in run_text or "groupadd" in run_text, (
+            "Dockerfile must create a dedicated system group"
+        )
+        assert "adduser" in run_text or "useradd" in run_text, (
+            "Dockerfile must create a dedicated system user"
+        )
+
+    def test_staticfiles_created_and_chowned_before_user(self, dockerfile_lines):
+        """Issue #89: /app/staticfiles must exist and be owned by the runtime
+        user before the USER directive; only that directory may be chowned
+        (never the whole /app tree)."""
+        user_indexes = self._directive_indexes(dockerfile_lines, "USER")
+        assert user_indexes, "Dockerfile must declare a USER"
+        first_user_idx = user_indexes[0]
+
+        before_user = dockerfile_lines[:first_user_idx]
+        before_user_text = "\n".join(before_user)
+        assert "/app/staticfiles" in before_user_text, (
+            "/app/staticfiles must be created before the USER directive"
+        )
+        assert "chown" in before_user_text, (
+            "staticfiles must be chowned to the runtime user before USER"
+        )
+
+        chown_lines = [
+            line for line in before_user
+            if "chown" in line.lower()
+        ]
+        for line in chown_lines:
+            assert "staticfiles" in line, (
+                f"chown must target only the staticfiles directory, never all /app: "
+                f"{line!r}"
+            )
+            assert not re.search(r"chown\s+\S+\s+/app\s*$", line.strip()), (
+                "chown must not grant the runtime user ownership of the whole /app"
+            )
+
+    def test_build_setup_steps_precede_user(self, dockerfile_lines):
+        """sed (CRLF fix) and chmod on entrypoint.sh must run before USER."""
+        user_indexes = self._directive_indexes(dockerfile_lines, "USER")
+        assert user_indexes, "Dockerfile must declare a USER"
+        first_user_idx = user_indexes[0]
+        before_user = "\n".join(dockerfile_lines[:first_user_idx])
+        assert "sed -i 's/\\r//' entrypoint.sh" in before_user, (
+            "sed CRLF fix must run before USER (root still owns the files)"
+        )
+        assert "chmod +x entrypoint.sh" in before_user, (
+            "chmod +x entrypoint.sh must run before USER"
+        )
+
+    def test_ends_with_non_root_named_user(self, dockerfile_lines):
+        """The build must end with USER <named-non-root> after COPY/build setup."""
+        user_indexes = self._directive_indexes(dockerfile_lines, "USER")
+        assert user_indexes, "Dockerfile must declare a USER"
+        last_user_idx = user_indexes[-1]
+        last_user = dockerfile_lines[last_user_idx].strip()
+        parts = last_user.split(None, 1)
+        arg = parts[1].strip() if len(parts) > 1 else ""
+        assert arg, "USER directive must name a user"
+        name = arg.split(":")[0].strip()
+        assert name.lower() not in ("root", "0"), (
+            f"final USER must be a non-root user, got: {arg!r}"
+        )
+
+        copy_indexes = self._directive_indexes(dockerfile_lines, "COPY")
+        assert copy_indexes, "Dockerfile must COPY application code"
+        assert last_user_idx > copy_indexes[-1], (
+            "final USER must come after the last COPY / build setup"
+        )
+
+    def test_expose_and_cmd_preserved(self, dockerfile_lines):
+        """EXPOSE 8080 and the entrypoint CMD must survive the hardening."""
+        assert "EXPOSE 8080" in "\n".join(dockerfile_lines), (
+            "Dockerfile must keep EXPOSE 8080"
+        )
+        cmd_lines = [
+            line for line in dockerfile_lines
+            if line.strip().upper().startswith("CMD ")
+        ]
+        assert cmd_lines, "Dockerfile must declare a CMD"
+        assert 'CMD ["sh", "./entrypoint.sh"]' in cmd_lines[-1].strip(), (
+            "Dockerfile must keep CMD [\"sh\", \"./entrypoint.sh\"]"
+        )
+
+
+class TestDockerComposeDevRootOverride:
+    """Issue #89: the dev docker-compose bind mount (.:/app) masks image
+    ownership, so the web service must explicitly run as root in development
+    only, with a comment explaining why, while the production Dockerfile
+    stays non-root.
+    """
+
+    @pytest.fixture
+    def compose_path(self):
+        return Path(__file__).resolve().parent.parent / "docker-compose.yml"
+
+    def _web_service_block(self, compose_text: str) -> str:
+        """Return the indented block of the `web:` service in docker-compose.yml."""
+        match = re.search(r"^  web:\n((?:    .*\n?)+)", compose_text, re.MULTILINE)
+        assert match is not None, "docker-compose.yml must define a web service"
+        return match.group(1)
+
+    def test_web_service_overrides_user_to_root(self, compose_path):
+        """Dev web service must set user: "0:0" because the bind mount masks
+        image ownership (host files keep host uid; non-root would lose write
+        access to staticfiles)."""
+        compose_text = compose_path.read_text()
+        web_block = self._web_service_block(compose_text)
+        user_lines = [
+            line.strip() for line in web_block.splitlines()
+            if line.strip().startswith("user:")
+        ]
+        assert user_lines, 'web service must override user (expected user: "0:0")'
+        assert 'user: "0:0"' in user_lines, (
+            f'web service must pin user: "0:0" for development, got: {user_lines!r}'
+        )
+
+    def test_web_service_user_override_has_dev_only_comment(self, compose_path):
+        """The override must carry a concise comment explaining the bind-mount
+        ownership reason and that production remains non-root."""
+        compose_text = compose_path.read_text()
+        web_block = self._web_service_block(compose_text)
+        lines = web_block.splitlines()
+        for i, line in enumerate(lines):
+            if line.strip().startswith('user: "0:0"'):
+                comment_lines = [
+                    prev.strip() for prev in lines[:i]
+                    if prev.strip().startswith("#")
+                ]
+                assert comment_lines, (
+                    'the user: "0:0" override must have an explanatory comment'
+                )
+                nearby = " ".join(comment_lines[-3:]).lower()
+                assert "bind" in nearby, (
+                    "comment must explain the bind-mount ownership reason"
+                )
+                assert "production" in nearby or "prod" in nearby, (
+                    "comment must state that the production Dockerfile stays non-root"
+                )
+                break
+        else:
+            pytest.fail('web service must contain a user: "0:0" override')
