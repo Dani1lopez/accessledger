@@ -20,6 +20,10 @@ services:
 
   web:
     build: .
+    # Dev-only: the bind mount (.:/app) masks image ownership with host uids,
+    # so a non-root container user could not write staticfiles. Production
+    # keeps the non-root USER from the Dockerfile.
+    user: "0:0"
     container_name: accessledger_web
     env_file:
       - .env
